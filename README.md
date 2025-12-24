@@ -6,6 +6,7 @@
 AI 에이전트가 쇼핑몰(Merchant)과 대화하고 결제 중계자(PSP)를 통해 안전하게 결제를 완료하는 **2-Server 아키텍처**를 시뮬레이션합니다.
 
 ## 📚 Documentation
+*   [Roadmap & Todo List](docs/TODO.md) - 프로젝트 진행 상황 및 계획
 *   [Architecture Overview](docs/ARCHITECTURE.md) - 상세 시퀀스 다이어그램 및 설계 철학
 *   [Database Schema](docs/DB_SCHEMA.md) - Merchant/PSP 분리 스키마 정의
 
