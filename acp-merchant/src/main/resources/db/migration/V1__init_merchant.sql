@@ -1,8 +1,11 @@
 -- Enable Extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Create Schema
+CREATE SCHEMA IF NOT EXISTS merchant;
+
 -- 1. Products (OpenAI Product Feed Spec)
-CREATE TABLE products (
+CREATE TABLE merchant.products (
     id              VARCHAR(255) PRIMARY KEY, -- SKU or UUID
     title           VARCHAR(255) NOT NULL,
     description     TEXT,
@@ -20,7 +23,7 @@ CREATE TABLE products (
 );
 
 -- 2. Orders (Merchant View)
-CREATE TABLE orders (
+CREATE TABLE merchant.orders (
     id              VARCHAR(36) PRIMARY KEY, -- UUID
     user_id         VARCHAR(255) NOT NULL,
     status          VARCHAR(50) NOT NULL, -- CREATED, AUTHORIZED, COMPLETED, CANCELED
@@ -31,14 +34,14 @@ CREATE TABLE orders (
     updated_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE order_lines (
+CREATE TABLE merchant.order_lines (
     id              VARCHAR(36) PRIMARY KEY,
-    order_id        VARCHAR(36) NOT NULL REFERENCES orders(id),
-    product_id      VARCHAR(255) NOT NULL REFERENCES products(id),
+    order_id        VARCHAR(36) NOT NULL REFERENCES merchant.orders(id),
+    product_id      VARCHAR(255) NOT NULL REFERENCES merchant.products(id),
     quantity        INTEGER NOT NULL,
     unit_price      NUMERIC(19, 4) NOT NULL,
     currency        VARCHAR(3) NOT NULL DEFAULT 'KRW',
     total_price     NUMERIC(19, 4) NOT NULL
 );
 
-CREATE INDEX idx_orders_user ON orders(user_id);
+CREATE INDEX idx_orders_user ON merchant.orders(user_id);
