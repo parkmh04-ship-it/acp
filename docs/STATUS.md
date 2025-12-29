@@ -9,30 +9,33 @@
    - ✅ PROJECT_PLAN.md: 12주 실행 계획서
    - ✅ README.md: 프로젝트 개요 및 빠른 시작 가이드
 
-2. **아키텍처 재설계**
-   - ✅ Merchant: Cafe24 프록시 서버로 역할 변경
-   - ✅ PSP: Multi-Provider Adapter (Strategy Pattern)
-   - ✅ 플로우: Agent ↔ Merchant 중개 ↔ PSP 중개 ↔ 실제 PSP
+2. **Phase 1: Product Feed 구현 완료**
+   - ✅ OpenAI Product Feed Spec 확장 필드 구현 (`ProductFeedItem`)
+   - ✅ Cafe24 -> ACP 변환 로직 확장 (신규 필드 매핑)
+   - ✅ Merchant DB 스키마 확장 (V1.1 마이그레이션 - 다중 이미지, 할인 정보 등)
+   - ✅ jOOQ CodeGen 재생성 및 적용
+
+3. **Phase 3: PSP 서버 - 카카오페이 연동 기초 구현**
+   - ✅ `KakaoPayProvider` 구현 (Ready/Approve API 연동)
+   - ✅ `PaymentService` 리팩토링 (실제 PG 연동 및 멱등성 처리 반영)
+   - ✅ PSP DB 스키마 및 jOOQ 설정 최적화 (PostgreSQL 드라이버 및 이스케이프 이슈 해결)
+   - ✅ 전체 프로젝트 빌드 성공 확인 (`./gradlew build -x test`)
 
 ## 🚧 다음 작업 (우선순위 순)
 
-### 즉시 착수 (Week 1)
+### 즉시 착수 (Week 1-2)
 
-1. **Cafe24 API 연동 준비**
-   - [ ] Cafe24 개발자 계정 생성
-   - [ ] OAuth 2.0 인증 구현
-   - [ ] 상품 조회 API 테스트
+1. **테스트 및 검증**
+   - [ ] `PaymentService` 및 `KakaoPayProvider` 단위 테스트 작성
+   - [ ] Merchant -> PSP 결제 준비 요청 E2E 테스트
 
-2. **Merchant 서버 - Cafe24 Adapter 구현**
-   - [ ] `Cafe24ProductClient` 인터페이스 정의
-   - [ ] WebClient 설정
-   - [ ] 상품 목록 조회 구현
-   - [ ] Cafe24 → ACP 변환 로직
+2. **Merchant 서버 - Checkout Flow 완성**
+   - [ ] `CheckoutSession` 도메인 및 엔드포인트 구현
+   - [ ] 가격 계산 엔진 (Tax, Shipping 포함)
 
-3. **PSP 서버 - Strategy Pattern 구현**
-   - [ ] `PaymentProvider` 인터페이스 정의
-   - [ ] `PaymentProviderFactory` 구현
-   - [ ] `KakaoPayProvider` 구현
+3. **고도화**
+   - [ ] Cafe24 OAuth 자동 갱신 (Redis 기반 토큰 스토리지)
+   - [ ] PSP 결제 취소 API 구현
 
 ---
 
@@ -45,4 +48,4 @@
 
 ---
 
-**Last Updated**: 2025-12-29T09:17:00+09:00
+**Last Updated**: 2025-12-29T22:00:00+09:00

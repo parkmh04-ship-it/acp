@@ -4,6 +4,7 @@ buildscript {
     }
     dependencies {
         classpath("org.postgresql:postgresql:42.7.2")
+        classpath("org.flywaydb:flyway-database-postgresql:10.10.0")
     }
 }
 
@@ -16,11 +17,13 @@ plugins {
 }
 
 flyway {
+    driver = "org.postgresql.Driver"
     url = "jdbc:postgresql://localhost:5432/acp"
     user = "user"
     password = "password"
     schemas = arrayOf("psp")
     createSchemas = true
+    baselineOnMigrate = true
 }
 
 dependencies {
@@ -29,6 +32,7 @@ dependencies {
     implementation(libs.spring.boot.starter.web)
     implementation(libs.jackson.module.kotlin)
     implementation(libs.spring.boot.starter.webflux) // For calling KakaoPay
+    implementation(libs.kotlin.logging) // Kotlin Logging
 
     // DB (PSP DB)
     implementation(libs.spring.boot.starter.jooq)

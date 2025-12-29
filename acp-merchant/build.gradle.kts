@@ -4,6 +4,7 @@ buildscript {
     }
     dependencies {
         classpath("org.postgresql:postgresql:42.7.2")
+        classpath("org.flywaydb:flyway-database-postgresql:10.10.0")
     }
 }
 
@@ -16,15 +17,21 @@ plugins {
 }
 
 flyway {
+    driver = "org.postgresql.Driver"
     url = "jdbc:postgresql://localhost:5432/acp"
     user = "user"
     password = "password"
     schemas = arrayOf("merchant")
     createSchemas = true
+    baselineOnMigrate = true
 }
 
 dependencies {
     implementation(project(":acp-shared"))
+    
+    // Flyway for Gradle
+    implementation("org.flywaydb:flyway-core")
+    implementation("org.flywaydb:flyway-database-postgresql")
     
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.validation)

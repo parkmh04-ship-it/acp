@@ -28,13 +28,24 @@ class Cafe24ToAcpConverter(@Value("\${cafe24.mall-id}") private val mallId: Stri
                 description = extractDescription(cafe24Product),
                 link = generateProductLink(cafe24Product.productNo),
                 imageLink = cafe24Product.detailImage ?: cafe24Product.listImage ?: "",
+                additionalImageLinks = extractAdditionalImages(cafe24Product),
                 price = formatPrice(cafe24Product.price),
+                currency = "KRW",
+                salePrice = cafe24Product.retailPrice?.let { formatPrice(it) },
                 availability = mapAvailability(cafe24Product),
                 productCategory = extractCategory(cafe24Product),
                 brand = cafe24Product.brandCode,
                 condition = mapCondition(cafe24Product.productCondition),
-                sellerName = mallId
+                sellerName = mallId,
+                merchantName = mallId,
+                merchantUrl = "https://$mallId.cafe24.com"
         )
+    }
+
+    /** 추가 이미지 추출 */
+    private fun extractAdditionalImages(product: Cafe24Product): List<String> {
+        return product.additionalImages?.mapNotNull { it.big ?: it.medium ?: it.small }
+                ?: emptyList()
     }
 
     /**

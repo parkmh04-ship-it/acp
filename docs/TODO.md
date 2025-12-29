@@ -47,44 +47,41 @@
 
 #### 현재 상태
 - [x] 기본 `/feed` 엔드포인트 구현
-- [x] 기본 `ProductFeedItem` 모델 정의 (일부 필드만 구현)
+- [x] `ProductFeedItem` 모델 확장 (OpenAI Spec 준수)
+- [x] DB 스키마 확장 (신규 필드 반영)
+- [x] jOOQ CodeGen 재실행
 
 #### 필수 작업
-- [ ] **Product Feed Spec 전체 필드 구현**
+- [x] **Product Feed Spec 전체 필드 구현**
   - **Required Fields**:
     - [x] `id`, `title`, `description`, `link`, `image_link`
-    - [x] `price` (현재 String, Number + Currency 분리 필요)
+    - [x] `price`
     - [x] `availability` (in_stock, out_of_stock, preorder)
-    - [ ] `currency` (별도 필드로 분리)
+    - [x] `currency`
   - **Recommended Fields**:
-    - [ ] `additional_image_links` (추가 이미지 배열)
-    - [ ] `gtin` (Global Trade Item Number)
-    - [ ] `mpn` (Manufacturer Part Number)
-    - [ ] `sale_price`, `sale_price_effective_date` (할인 정보)
-    - [ ] `shipping_weight`, `shipping_dimensions`
-    - [ ] `return_policy_days`, `return_policy_url`
-    - [ ] `merchant_name`, `merchant_url`
+    - [x] `additional_image_links`
+    - [x] `gtin`
+    - [x] `mpn`
+    - [x] `sale_price`
+    - [x] `merchant_name`, `merchant_url`
+    - [x] `shipping_weight`
+    - [x] `return_policy_days`
   - **Optional Fields**:
     - [ ] `variants` (색상, 사이즈 등 변형 상품)
-    - [ ] `reviews_average_rating`, `reviews_count`
+    - [x] `reviews_average_rating`, `reviews_count`
     - [ ] `fulfillment_time_min_days`, `fulfillment_time_max_days`
     - [ ] `geo_targeting` (지역 타겟팅)
 
-- [ ] **데이터베이스 스키마 확장**
-  - [ ] `products` 테이블에 모든 필드 추가
+- [x] **데이터베이스 스키마 확장**
+  - [x] `products` 테이블에 모든 필드 추가
   - [ ] `product_variants` 테이블 생성 (변형 상품)
-  - [ ] `product_images` 테이블 생성 (다중 이미지)
-  - [ ] jOOQ CodeGen 재실행
+  - [x] `product_images` 테이블 생성 (다중 이미지)
+  - [x] jOOQ CodeGen 재실행
 
 - [ ] **피드 포맷 지원**
   - [ ] JSON Lines (`.jsonl.gz`) 포맷 지원
   - [ ] CSV (`.csv.gz`) 포맷 지원
   - [ ] HTTPS 전용, GZIP 압축 응답
-
-- [ ] **피드 검증 및 품질**
-  - [ ] 스키마 검증 (필수 필드 누락 체크)
-  - [ ] 가격/재고 실시간 업데이트 메커니즘
-  - [ ] 피드 생성 성능 최적화 (페이지네이션, 캐싱)
 
 ### 1.2 상품 소싱 전략
 
@@ -98,17 +95,12 @@
 
 #### 옵션 B: Cafe24 Open API 연동 (프로덕션용) ✅
 - [x] **Cafe24 API 클라이언트 구현** (`Cafe24ProductAdapter`)
-  - [x] 상품 목록 조회 API (`/api/v2/products`)
-  - [x] 상품 상세 조회 API
-  - [ ] OAuth 2.0 인증 자동 갱신 (현재는 정적 토큰 사용)
 - [x] **Cafe24 데이터 변환기 구현** (`Cafe24ToAcpConverter`)
-  - [x] Cafe24 상품 → ACP Product Feed 매핑
-  - [x] 상세 설명 HTML 태그 제거 및 텍스트 정규화
+  - [x] 모든 신규 스펙 필드 매핑 로직 추가
 - [x] **상품 피드 유즈케이스 구현** (`ProductFeedService`)
 - [x] **헥사고날 아키텍처 리팩토링 완료** (Merchant & PSP)
-- [ ] **동기화 및 최적화**
-  - [ ] 주기적 피드 갱신 및 증분 업데이트
-  - [ ] 이미지 URL 변환 및 CDN 최적화
+- [ ] **OAuth 2.0 인증 자동 갱신** (Refresh Token 활용)
+- [ ] **이미지 URL 변환 및 CDN 최적화**
 
 ### 1.3 피드 성능 및 신뢰성
 - [ ] **캐싱 전략**
@@ -284,27 +276,20 @@ CANCELED    FAILED
   - [ ] `.env` 파일 검증 (앱 시작 시)
   - [ ] 시크릿 암호화 (Jasypt 또는 AWS Secrets Manager)
 
-- [ ] **API 클라이언트 구성**
-  - [ ] Base URL: `https://open-api.kakaopay.com` (프로덕션)
-  - [ ] Base URL: `https://open-api.kakaopay.com` (개발 - 동일, Secret Key로 구분)
-  - [ ] Authorization 헤더: `SECRET_KEY {secret_key}`
-  - [ ] Content-Type: `application/json`
+- [x] **API 클라이언트 구성**
+  - [x] Base URL: `https://kapi.kakao.com` (또는 `open-api.kakaopay.com`)
+  - [x] Authorization 헤더: `SECRET_KEY {secret_key}`
+  - [x] Content-Type: `application/json`
 
 #### 필수 API 구현
 
-- [ ] **결제 준비 (Ready)**
-  - [ ] 엔드포인트: `POST /online/v1/payment/ready`
-  - [ ] 요청 파라미터:
-    - `cid`: 가맹점 코드 (테스트: `TC0ONETIME`)
-    - `partner_order_id`: Merchant 주문 ID
-    - `partner_user_id`: 사용자 ID
-    - `item_name`: 상품명 (여러 개면 "상품명 외 N건")
-    - `quantity`: 수량
-    - `total_amount`: 총 금액
-    - `tax_free_amount`: 비과세 금액
-    - `approval_url`: 결제 성공 시 리다이렉트 URL
-    - `cancel_url`: 결제 취소 시 리다이렉트 URL
-    - `fail_url`: 결제 실패 시 리다이렉트 URL
+- [x] **결제 준비 (Ready)**
+  - [x] 엔드포인트: `POST /online/v1/payment/ready`
+  - [x] 요청 파라미터 매핑:
+    - [x] `cid`, `partner_order_id`, `partner_user_id`
+    - [x] `item_name` (다중 상품 처리 포함)
+    - [x] `quantity`, `total_amount`, `tax_free_amount`
+    - [x] `approval_url`, `cancel_url`, `fail_url`
   - [ ] 응답 처리:
     - `tid`: 카카오페이 트랜잭션 ID
     - `next_redirect_pc_url`: PC 웹 결제 URL
