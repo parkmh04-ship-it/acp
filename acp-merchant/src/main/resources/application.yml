@@ -10,6 +10,8 @@ spring:
     password: password
   jooq:
     sql-dialect: POSTGRES
+  jackson:
+    property-naming-strategy: SNAKE_CASE
 
 psp:
   base-url: http://localhost:8081

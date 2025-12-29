@@ -8,6 +8,8 @@ spring:
     driver-class-name: org.postgresql.Driver
   jooq:
     sql-dialect: POSTGRES
+  jackson:
+    property-naming-strategy: SNAKE_CASE
   flyway:
     enabled: true
     clean-disabled: false

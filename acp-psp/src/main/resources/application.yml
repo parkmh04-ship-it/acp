@@ -10,6 +10,8 @@ spring:
     password: password
   jooq:
     sql-dialect: POSTGRES
+  jackson:
+    property-naming-strategy: SNAKE_CASE
 
 kakaopay:
   base-url: https://kapi.kakao.com

@@ -1,6 +1,8 @@
 package com.acp.psp.adapter.outbound.kakaopay
 
+import com.acp.psp.adapter.outbound.kakaopay.dto.KakaoPayApproveRequest
 import com.acp.psp.adapter.outbound.kakaopay.dto.KakaoPayApproveResponse
+import com.acp.psp.adapter.outbound.kakaopay.dto.KakaoPayReadyRequest
 import com.acp.psp.adapter.outbound.kakaopay.dto.KakaoPayReadyResponse
 import com.acp.psp.application.port.output.*
 import com.acp.schema.payment.PaymentPrepareRequest
@@ -43,20 +45,17 @@ class KakaoPayProvider(
         val totalQuantity = request.items.sumOf { it.quantity }
 
         val body =
-                mapOf(
-                        "cid" to cid,
-                        "partner_order_id" to request.merchantOrderId,
-                        "partner_user_id" to "ACP_USER", // TODO: 실제 사용자 ID 매핑
-                        "item_name" to itemName,
-                        "quantity" to totalQuantity.toString(),
-                        "total_amount" to request.amount.toString(),
-                        "tax_free_amount" to "0",
-                        "approval_url" to
-                                "http://localhost:8080/api/v1/payments/success", // TODO: 실제 콜백 URL
-                        // (Merchant 쪽
-                        // 엔드포인트)
-                        "cancel_url" to "http://localhost:8080/api/v1/payments/cancel",
-                        "fail_url" to "http://localhost:8080/api/v1/payments/fail"
+                KakaoPayReadyRequest(
+                        cid = cid,
+                        partnerOrderId = request.merchantOrderId,
+                        partnerUserId = "ACP_USER", // TODO: 실제 사용자 ID 매핑
+                        itemName = itemName,
+                        quantity = totalQuantity,
+                        totalAmount = request.amount.toInt(),
+                        taxFreeAmount = 0,
+                        approvalUrl = "http://localhost:8080/api/v1/payments/success", // TODO: 실제 콜백 URL
+                        cancelUrl = "http://localhost:8080/api/v1/payments/cancel",
+                        failUrl = "http://localhost:8080/api/v1/payments/fail"
                 )
 
         val response =
@@ -85,12 +84,12 @@ class KakaoPayProvider(
         val tid = "TODO_GET_FROM_DB"
 
         val body =
-                mapOf(
-                        "cid" to cid,
-                        "tid" to tid,
-                        "partner_order_id" to paymentId,
-                        "partner_user_id" to "ACP_USER",
-                        "pg_token" to pgToken
+                KakaoPayApproveRequest(
+                        cid = cid,
+                        tid = tid,
+                        partnerOrderId = paymentId,
+                        partnerUserId = "ACP_USER",
+                        pgToken = pgToken
                 )
 
         val response =
