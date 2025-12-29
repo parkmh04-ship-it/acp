@@ -45,6 +45,7 @@ dependencies {
 
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.kotlin.coroutines.test)
+    testImplementation("io.mockk:mockk:1.13.12")
 }
 
 sourceSets {
@@ -85,4 +86,8 @@ jooq {
             }
         }
     }
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
 }

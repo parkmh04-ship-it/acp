@@ -15,11 +15,14 @@
    - ✅ Merchant DB 스키마 확장 (V1.1 마이그레이션 - 다중 이미지, 할인 정보 등)
    - ✅ jOOQ CodeGen 재생성 및 적용
 
-3. **Phase 3: PSP 서버 - 카카오페이 연동 기초 구현**
+3. **Phase 3: PSP 서버 - 카카오페이 연동 및 테스트 완료**
    - ✅ `KakaoPayProvider` 구현 (Ready/Approve API 연동)
    - ✅ `PaymentService` 리팩토링 (실제 PG 연동 및 멱등성 처리 반영)
-   - ✅ PSP DB 스키마 및 jOOQ 설정 최적화 (PostgreSQL 드라이버 및 이스케이프 이슈 해결)
-   - ✅ 전체 프로젝트 빌드 성공 확인 (`./gradlew build -x test`)
+   - ✅ **단위 테스트 구현 완료**
+     - `PaymentServiceTest`: 멱등성 및 로직 검사 통과
+     - `KakaoPayProviderTest`: WebClient 모킹 기반 API 연동 검사 통과
+   - ✅ PSP DB 스키마 및 jOOQ 설정 최적화 완료
+   - ✅ 전체 프로젝트 빌드 및 테스트 성공 확인
 
 ## 🚧 다음 작업 (우선순위 순)
 
