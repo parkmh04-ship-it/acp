@@ -7,9 +7,19 @@
 ## 🔑 인증 정보
 
 ### 앱 정보
-- **Client ID**: `qiLpnOXHBtIuke056I0FvD`
-- **Client Secret**: `ifcidJ5MVa3TJ2lkzUxdNH`
-- **Service Key**: `fS/FHhPbM2tO0sLuG98FiotvcsOalTc1Oa4UfQbeNEo=`
+
+**중요**: 실제 인증 정보는 `.env` 파일에서 관리합니다. 절대 Git에 커밋하지 마세요!
+
+환경 변수 설정:
+```bash
+# .env 파일에 다음 정보 입력
+CAFE24_CLIENT_ID=your_client_id_here
+CAFE24_CLIENT_SECRET=your_client_secret_here
+CAFE24_SERVICE_KEY=your_service_key_here
+CAFE24_MALL_ID=your_mall_id_here
+```
+
+인증 정보는 [Cafe24 개발자센터](https://developers.cafe24.com/)에서 앱 생성 후 확인할 수 있습니다.
 
 ### Webhook 수신 IP (방화벽 허용 필요)
 | Name | IP | Port |
