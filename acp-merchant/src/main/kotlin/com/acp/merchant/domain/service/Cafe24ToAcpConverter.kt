@@ -4,7 +4,7 @@ import com.acp.merchant.adapter.outbound.cafe24.dto.Cafe24Product
 import com.acp.schema.feed.Availability
 import com.acp.schema.feed.Condition
 import com.acp.schema.feed.ProductFeedItem
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 

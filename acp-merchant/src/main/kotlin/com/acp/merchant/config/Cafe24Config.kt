@@ -1,6 +1,6 @@
 package com.acp.merchant.config
 
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -37,17 +37,19 @@ class Cafe24Config(
     fun cafe24WebClient(): WebClient {
         logger.info { "Initializing Cafe24 WebClient with baseUrl: $baseUrl" }
 
-        return WebClient.builder()
-                .baseUrl(baseUrl)
-                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .apply {
-                    if (accessToken.isNotBlank()) {
-                        logger.info { "Access token configured for Cafe24 API" }
-                        defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-                    } else {
-                        logger.warn { "No access token configured. API calls may fail." }
-                    }
-                }
+        val builder =
+                WebClient.builder()
+                        .baseUrl(baseUrl)
+                        .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+
+        if (accessToken.isNotBlank()) {
+            logger.info { "Access token configured for Cafe24 API" }
+            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+        } else {
+            logger.warn { "No access token configured. API calls may fail." }
+        }
+
+        return builder
                 .filter { request, next ->
                     logger.debug { "Cafe24 API Request: ${request.method()} ${request.url()}" }
                     next.exchange(request)

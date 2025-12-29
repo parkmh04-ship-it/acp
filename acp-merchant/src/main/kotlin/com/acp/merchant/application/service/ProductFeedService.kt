@@ -4,7 +4,7 @@ import com.acp.merchant.application.port.input.GetProductFeedUseCase
 import com.acp.merchant.application.port.output.Cafe24ProductClient
 import com.acp.merchant.domain.service.Cafe24ToAcpConverter
 import com.acp.schema.feed.ProductFeedItem
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 
 private val logger = KotlinLogging.logger {}

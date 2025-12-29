@@ -30,6 +30,7 @@ dependencies {
     implementation(libs.spring.boot.starter.validation)
     implementation(libs.jackson.module.kotlin)
     implementation(libs.spring.boot.starter.webflux) // For calling PSP
+    implementation(libs.kotlin.logging) // Kotlin Logging
 
     // DB (Merchant DB)
     implementation(libs.spring.boot.starter.jooq)

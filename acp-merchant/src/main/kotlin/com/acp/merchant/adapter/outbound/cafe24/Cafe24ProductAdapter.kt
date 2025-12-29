@@ -4,7 +4,7 @@ import com.acp.merchant.adapter.outbound.cafe24.dto.Cafe24Product
 import com.acp.merchant.adapter.outbound.cafe24.dto.Cafe24ProductsResponse
 import com.acp.merchant.application.port.output.Cafe24ProductClient
 import kotlinx.coroutines.reactor.awaitSingle
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToMono

@@ -2,7 +2,7 @@ package com.acp.merchant.adapter.inbound.web
 
 import com.acp.merchant.application.port.input.GetProductFeedUseCase
 import com.acp.schema.feed.ProductFeedItem
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
