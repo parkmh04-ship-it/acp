@@ -1,6 +1,6 @@
-package com.acp.psp.controller
+package com.acp.psp.adapter.inbound.web
 
-import com.acp.psp.service.PaymentService
+import com.acp.psp.application.port.input.PaymentUseCase
 import com.acp.schema.payment.PaymentPrepareRequest
 import com.acp.schema.payment.PaymentPrepareResponse
 import org.springframework.web.bind.annotation.PostMapping
@@ -8,14 +8,15 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
+/** 결제 API 컨트롤러 (Inbound Adapter) */
 @RestController
 @RequestMapping("/api/v1/payments")
-class PaymentController(
-    private val paymentService: PaymentService
-) {
+class PaymentController(private val paymentUseCase: PaymentUseCase) {
 
     @PostMapping("/prepare")
-    suspend fun preparePayment(@RequestBody request: PaymentPrepareRequest): PaymentPrepareResponse {
-        return paymentService.preparePayment(request)
+    suspend fun preparePayment(
+            @RequestBody request: PaymentPrepareRequest
+    ): PaymentPrepareResponse {
+        return paymentUseCase.preparePayment(request)
     }
 }

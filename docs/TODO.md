@@ -96,18 +96,19 @@
   - [ ] 변형 상품 (색상, 사이즈) 포함
   - [ ] 리뷰, 평점 데이터 포함
 
-#### 옵션 B: Cafe24 Open API 연동 (프로덕션용)
-- [ ] **Cafe24 API 클라이언트 구현**
-  - [ ] OAuth 2.0 인증 플로우
-  - [ ] 상품 목록 조회 API (`/api/v2/products`)
-  - [ ] 상품 상세 조회 API
-  - [ ] 재고/가격 실시간 동기화
-- [ ] **데이터 변환 레이어**
-  - [ ] Cafe24 상품 → ACP Product Feed 매핑
+#### 옵션 B: Cafe24 Open API 연동 (프로덕션용) ✅
+- [x] **Cafe24 API 클라이언트 구현** (`Cafe24ProductAdapter`)
+  - [x] 상품 목록 조회 API (`/api/v2/products`)
+  - [x] 상품 상세 조회 API
+  - [ ] OAuth 2.0 인증 자동 갱신 (현재는 정적 토큰 사용)
+- [x] **Cafe24 데이터 변환기 구현** (`Cafe24ToAcpConverter`)
+  - [x] Cafe24 상품 → ACP Product Feed 매핑
+  - [x] 상세 설명 HTML 태그 제거 및 텍스트 정규화
+- [x] **상품 피드 유즈케이스 구현** (`ProductFeedService`)
+- [x] **헥사고날 아키텍처 리팩토링 완료** (Merchant & PSP)
+- [ ] **동기화 및 최적화**
+  - [ ] 주기적 피드 갱신 및 증분 업데이트
   - [ ] 이미지 URL 변환 및 CDN 최적화
-- [ ] **동기화 스케줄러**
-  - [ ] 주기적 피드 갱신 (5분마다)
-  - [ ] 변경 감지 및 증분 업데이트
 
 ### 1.3 피드 성능 및 신뢰성
 - [ ] **캐싱 전략**

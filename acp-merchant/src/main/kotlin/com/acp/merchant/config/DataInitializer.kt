@@ -1,6 +1,6 @@
 package com.acp.merchant.config
 
-import com.acp.merchant.service.ProductService
+import com.acp.merchant.application.port.input.ProductAdminUseCase
 import kotlinx.coroutines.runBlocking
 import org.springframework.boot.CommandLineRunner
 import org.springframework.context.annotation.Bean
@@ -8,15 +8,13 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Profile
 
 @Configuration
-class DataInitializer(
-    private val productService: ProductService
-) {
+class DataInitializer(private val productAdminUseCase: ProductAdminUseCase) {
 
     @Bean
     @Profile("!test") // Don't run in tests to avoid interference
     fun initData() = CommandLineRunner {
         runBlocking {
-            productService.initMockData()
+            productAdminUseCase.initMockData()
             println("✅ Mock Product Data Initialized")
         }
     }
