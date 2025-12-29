@@ -5,6 +5,7 @@ import com.acp.merchant.adapter.outbound.cafe24.dto.Cafe24ProductsResponse
 import com.acp.merchant.application.port.output.Cafe24ProductClient
 import kotlinx.coroutines.reactor.awaitSingle
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToMono
@@ -19,6 +20,7 @@ private val logger = KotlinLogging.logger {}
  * @see https://developers.cafe24.com/docs/ko/api/front/#products
  */
 @Component
+@Profile("!test")
 class Cafe24ProductAdapter(private val cafe24WebClient: WebClient) : Cafe24ProductClient {
 
     companion object {

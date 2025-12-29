@@ -1,0 +1,23 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: acp-merchant
+  datasource:
+    url: jdbc:postgresql://localhost:5432/acp
+    username: user
+    password: password
+  jooq:
+    sql-dialect: POSTGRES
+
+psp:
+  base-url: http://localhost:8081
+
+cafe24:
+  api:
+    base-url: ${CAFE24_API_BASE_URL:https://your_mall_id.cafe24api.com}
+  client-id: ${CAFE24_CLIENT_ID:}
+  client-secret: ${CAFE24_CLIENT_SECRET:}
+  access-token: ${CAFE24_ACCESS_TOKEN:}
+  mall-id: ${CAFE24_MALL_ID:your_mall_id}

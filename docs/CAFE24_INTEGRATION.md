@@ -227,8 +227,8 @@ fun Cafe24Product.toAcpProductFeedItem(): ProductFeedItem {
 ```kotlin
 @Configuration
 class Cafe24Config(
-    @Value("\${cafe24.api.base-url}") private val baseUrl: String,
-    @Value("\${cafe24.access-token}") private val accessToken: String
+    @field:Value("\${cafe24.api.base-url}") private val baseUrl: String,
+    @field:Value("\${cafe24.access-token}") private val accessToken: String
 ) {
     @Bean
     fun cafe24WebClient(): WebClient {

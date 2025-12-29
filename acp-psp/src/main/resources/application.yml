@@ -1,0 +1,16 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: acp-psp
+  datasource:
+    url: jdbc:postgresql://localhost:5432/acp
+    username: user
+    password: password
+  jooq:
+    sql-dialect: POSTGRES
+
+kakaopay:
+  base-url: https://kapi.kakao.com
+  secret-key: ${KAKAOPAY_SECRET_KEY_DEV}

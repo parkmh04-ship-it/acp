@@ -17,13 +17,20 @@ private val logger = KotlinLogging.logger {}
  *
  * Cafe24 API 호출을 위한 WebClient 및 관련 설정을 제공합니다.
  */
-@Configuration
-class Cafe24Config(
-        @Value("\${cafe24.api.base-url}") private val baseUrl: String,
-        @Value("\${cafe24.client-id}") private val clientId: String,
-        @Value("\${cafe24.client-secret}") private val clientSecret: String,
-        @Value("\${cafe24.access-token:}") private val accessToken: String
-) {
+@Configuration(proxyBeanMethods = false)
+class Cafe24Config {
+
+    @field:Value("\${cafe24.api.base-url}")
+    lateinit var baseUrl: String
+
+    @field:Value("\${cafe24.client-id}")
+    lateinit var clientId: String
+
+    @field:Value("\${cafe24.client-secret}")
+    lateinit var clientSecret: String
+
+    @field:Value("\${cafe24.access-token:}")
+    lateinit var accessToken: String
 
     /**
      * Cafe24 API 호출용 WebClient
@@ -38,9 +45,9 @@ class Cafe24Config(
         logger.info { "Initializing Cafe24 WebClient with baseUrl: $baseUrl" }
 
         val builder =
-                WebClient.builder()
-                        .baseUrl(baseUrl)
-                        .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            WebClient.builder()
+                .baseUrl(baseUrl)
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
 
         if (accessToken.isNotBlank()) {
             logger.info { "Access token configured for Cafe24 API" }
@@ -50,35 +57,36 @@ class Cafe24Config(
         }
 
         return builder
-                .filter { request, next ->
-                    logger.debug { "Cafe24 API Request: ${request.method()} ${request.url()}" }
-                    next.exchange(request)
-                            .doOnError { error ->
-                                when (error) {
-                                    is WebClientResponseException -> {
-                                        logger.error {
-                                            "Cafe24 API Error: ${error.statusCode} - ${error.responseBodyAsString}"
-                                        }
-                                    }
-                                    else -> {
-                                        logger.error(error) { "Cafe24 API Request failed" }
-                                    }
+            .filter { request, next ->
+                logger.debug { "Cafe24 API Request: ${request.method()} ${request.url()}" }
+                next.exchange(request)
+                    .doOnError { error ->
+                        when (error) {
+                            is WebClientResponseException -> {
+                                logger.error {
+                                    "Cafe24 API Error: ${error.statusCode} - ${error.responseBodyAsString}"
                                 }
                             }
-                            .onErrorResume { error ->
-                                logger.error(error) {
-                                    "Cafe24 API call failed, returning empty response"
-                                }
-                                Mono.error(error)
+
+                            else -> {
+                                logger.error(error) { "Cafe24 API Request failed" }
                             }
-                }
-                .build()
+                        }
+                    }
+                    .onErrorResume { error ->
+                        logger.error(error) {
+                            "Cafe24 API call failed, returning empty response"
+                        }
+                        Mono.error(error)
+                    }
+            }
+            .build()
     }
 
     /** Cafe24 OAuth 설정 정보 */
     @Bean
-    fun cafe24OAuthConfig() =
-            Cafe24OAuthConfig(clientId = clientId, clientSecret = clientSecret, baseUrl = baseUrl)
+    open fun cafe24OAuthConfig() =
+        Cafe24OAuthConfig(clientId = clientId, clientSecret = clientSecret, baseUrl = baseUrl)
 }
 
 /** Cafe24 OAuth 설정 정보를 담는 데이터 클래스 */

@@ -5,7 +5,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE SCHEMA IF NOT EXISTS psp;
 
 -- 1. Payment Partner Meta
-CREATE TABLE psp.payment_partner_meta (
+CREATE TABLE IF NOT EXISTS psp.payment_partner_meta (
     id              VARCHAR(36) PRIMARY KEY,
     provider        VARCHAR(50) NOT NULL,
     client_id       VARCHAR(255),
@@ -16,7 +16,7 @@ CREATE TABLE psp.payment_partner_meta (
 );
 
 -- 2. Payments (Transaction Master)
-CREATE TABLE psp.payments (
+CREATE TABLE IF NOT EXISTS psp.payments (
     id              VARCHAR(36) PRIMARY KEY, -- PSP Internal ID
     merchant_order_id VARCHAR(36) NOT NULL, -- Reference to Merchant Order
     amount          NUMERIC(19, 4) NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE psp.payments (
 );
 
 -- 3. Payment Methods
-CREATE TABLE psp.payment_methods (
+CREATE TABLE IF NOT EXISTS psp.payment_methods (
     id              VARCHAR(36) PRIMARY KEY,
     payment_id      VARCHAR(36) NOT NULL REFERENCES psp.payments(id),
     type            VARCHAR(50) NOT NULL,
@@ -43,5 +43,5 @@ CREATE TABLE psp.payment_methods (
     created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_payments_merchant_order ON psp.payments(merchant_order_id);
-CREATE INDEX idx_payments_pg_tid ON psp.payments(pg_tid);
+CREATE INDEX IF NOT EXISTS idx_payments_merchant_order ON psp.payments(merchant_order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_pg_tid ON psp.payments(pg_tid);

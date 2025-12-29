@@ -18,7 +18,7 @@ private val logger = KotlinLogging.logger {}
  * @see https://developers.openai.com/commerce/specs/feed
  */
 @Service
-class Cafe24ToAcpConverter(@Value("\${cafe24.mall-id}") private val mallId: String) {
+class Cafe24ToAcpConverter(@param:Value("\${cafe24.mall-id}") private val mallId: String) {
 
     /** Cafe24 상품을 ACP ProductFeedItem으로 변환 */
     fun convert(cafe24Product: Cafe24Product): ProductFeedItem {
