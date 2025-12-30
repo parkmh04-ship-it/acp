@@ -25,7 +25,18 @@
      - `PaymentIntegrationTest`: 전체 결제 준비 플로우 통합 테스트 통과 (Mock Provider 사용)
    - ✅ PSP DB 스키마 및 jOOQ 설정 최적화 완료
 
-4. **시스템 안정화 및 코드 품질 개선** (2025-12-29)
+4. **Phase 2: Merchant 서버 - Checkout Flow 구현 (진행중)** (2025-12-30)
+   - ✅ **Checkout Session 도메인 및 DB 구현**: `CheckoutSession`, `CheckoutItem`, V1.2 마이그레이션 완료
+   - ✅ **Persistence Layer**: jOOQ 기반 `CheckoutPersistenceAdapter` 구현
+   - ✅ **Pricing Engine**: `PricingEngine` 도메인 서비스 구현 (기본 Tax 계산 로직 포함)
+   - ✅ **PSP 연동**: `PaymentClient` 구현 (Merchant -> PSP `POST /prepare` 연동)
+   - ✅ **Checkout API**: 
+     - `POST /checkout_sessions`: 세션 생성
+     - `GET /checkout_sessions/{id}`: 세션 조회
+     - `POST /checkout_sessions/{id}/complete`: 결제 준비 및 리다이렉트 URL 발급
+   - ✅ **통합 테스트 완료**: `CheckoutIntegrationTest` (세션 생성, 상태 확인, PSP 연동 검증)
+
+5. **시스템 안정화 및 코드 품질 개선** (2025-12-29)
    - ✅ **Flyway 마이그레이션 멱등성 확보**: `IF NOT EXISTS` 구문 추가로 테스트 환경 충돌 방지
    - ✅ **테스트 격리 환경 구축**: 테스트용 `application.yml` 분리 및 Flyway 검증 최적화
    - ✅ **의존성 주입 문제 해결**: Kotlin 생성자 주입 시 `@Value` 어노테이션 호환성 수정
@@ -36,10 +47,10 @@
 
 ### 즉시 착수 (Week 2)
 
-1. **Merchant 서버 - Checkout Flow 완성**
-   - [ ] `CheckoutSession` 도메인 및 엔드포인트 구현
-   - [ ] 가격 계산 엔진 (Tax, Shipping 포함) 구현
-   - [ ] Merchant -> PSP 결제 준비 요청 연동 및 E2E 테스트
+1. **Merchant 서버 - Checkout Flow 고도화**
+   - [ ] `POST /checkout_sessions/{id}` (세션 업데이트) 구현
+   - [ ] 배송비 계산 로직 (Fulfillment Options)
+   - [ ] 주소 유효성 검증
 
 2. **고도화 및 보안**
    - [ ] Cafe24 OAuth 자동 갱신 (Redis 기반 토큰 스토리지)
@@ -57,4 +68,4 @@
 
 ---
 
-**Last Updated**: 2025-12-29T23:15:00+09:00
+**Last Updated**: 2025-12-30T12:55:00+09:00

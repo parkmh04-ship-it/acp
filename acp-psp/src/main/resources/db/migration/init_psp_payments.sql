@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS psp.payments (
     status          VARCHAR(50) NOT NULL, -- READY, IN_PROGRESS, DONE, CANCELED, FAILED
     pg_tid          VARCHAR(255),
     pg_token        VARCHAR(255),
-    partner_meta_id VARCHAR(36) REFERENCES psp.payment_partner_meta(id),
+    partner_meta_id VARCHAR(36), -- FK Removed: REFERENCES psp.payment_partner_meta(id)
     created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     approved_at     TIMESTAMP WITH TIME ZONE,
     failed_at       TIMESTAMP WITH TIME ZONE,
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS psp.payments (
 -- 3. Payment Methods
 CREATE TABLE IF NOT EXISTS psp.payment_methods (
     id              VARCHAR(36) PRIMARY KEY,
-    payment_id      VARCHAR(36) NOT NULL REFERENCES psp.payments(id),
+    payment_id      VARCHAR(36) NOT NULL, -- FK Removed: REFERENCES psp.payments(id)
     type            VARCHAR(50) NOT NULL,
     provider        VARCHAR(50) NOT NULL,
     card_bin        VARCHAR(6),
@@ -45,3 +45,4 @@ CREATE TABLE IF NOT EXISTS psp.payment_methods (
 
 CREATE INDEX IF NOT EXISTS idx_payments_merchant_order ON psp.payments(merchant_order_id);
 CREATE INDEX IF NOT EXISTS idx_payments_pg_tid ON psp.payments(pg_tid);
+CREATE INDEX IF NOT EXISTS idx_payment_methods_payment_id ON psp.payment_methods(payment_id);

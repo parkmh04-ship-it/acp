@@ -14,7 +14,7 @@ ALTER TABLE merchant.products
 -- Create Product Images table for additional images
 CREATE TABLE IF NOT EXISTS merchant.product_images (
     id              BIGSERIAL PRIMARY KEY,
-    product_id      VARCHAR(255) NOT NULL REFERENCES merchant.products(id) ON DELETE CASCADE,
+    product_id      VARCHAR(255) NOT NULL, -- FK Removed: REFERENCES merchant.products(id) ON DELETE CASCADE
     image_url       TEXT NOT NULL,
     image_type      VARCHAR(50) NOT NULL, -- main, additional, thumbnail
     display_order   INTEGER NOT NULL DEFAULT 0,

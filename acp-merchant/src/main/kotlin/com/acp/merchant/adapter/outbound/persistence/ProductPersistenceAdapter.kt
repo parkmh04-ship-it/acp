@@ -15,6 +15,13 @@ class ProductPersistenceAdapter(private val dsl: DSLContext) : ProductPersistenc
     override suspend fun findAll(): List<Products> =
             withContext(Dispatchers.IO) { dsl.selectFrom(PRODUCTS).fetchInto(Products::class.java) }
 
+    override suspend fun findById(id: String): Products? =
+            withContext(Dispatchers.IO) {
+                dsl.selectFrom(PRODUCTS)
+                   .where(PRODUCTS.ID.eq(id))
+                   .fetchOneInto(Products::class.java)
+            }
+
     override suspend fun saveAll(products: List<Products>): Unit =
             withContext(Dispatchers.IO) {
                 val records = products.map { product -> dsl.newRecord(PRODUCTS, product) }

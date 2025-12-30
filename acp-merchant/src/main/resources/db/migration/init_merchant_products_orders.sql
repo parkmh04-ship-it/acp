@@ -29,19 +29,27 @@ CREATE TABLE IF NOT EXISTS merchant.orders (
     status          VARCHAR(50) NOT NULL, -- CREATED, AUTHORIZED, COMPLETED, CANCELED
     total_amount    NUMERIC(19, 4) NOT NULL,
     currency        VARCHAR(3) NOT NULL DEFAULT 'KRW',
-    payment_request_id VARCHAR(36), -- Reference to PSP's payment ID (Virtual FK)
+    payment_request_id VARCHAR(36), -- Reference to PSP's payment ID
     created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS merchant.order_lines (
     id              VARCHAR(36) PRIMARY KEY,
-    order_id        VARCHAR(36) NOT NULL REFERENCES merchant.orders(id),
-    product_id      VARCHAR(255) NOT NULL REFERENCES merchant.products(id),
+    order_id        VARCHAR(36) NOT NULL, -- FK Removed
+    product_id      VARCHAR(255) NOT NULL, -- FK Removed
     quantity        INTEGER NOT NULL,
     unit_price      NUMERIC(19, 4) NOT NULL,
     currency        VARCHAR(3) NOT NULL DEFAULT 'KRW',
     total_price     NUMERIC(19, 4) NOT NULL
 );
 
+-- Indices for logic joins
 CREATE INDEX IF NOT EXISTS idx_orders_user ON merchant.orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_order_lines_order_id ON merchant.order_lines(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_lines_product_id ON merchant.order_lines(product_id);
+
+-- 3. Product Images (V1.1 content merged or kept separate depending on strategy, but modifying V1 base here)
+-- Note: V1.1 is usually separate, but if recreating schema, we stick to file structure.
+-- Assuming V1.1 adds columns, but V1 also had some structure. 
+-- Wait, original V1 didn't have product_images? Let me check existing V1.1

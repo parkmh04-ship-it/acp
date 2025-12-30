@@ -1,0 +1,22 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:postgresql://localhost:5432/acp
+    username: user
+    password: password
+  sql:
+    init:
+      mode: never
+
+psp:
+  base-url: http://localhost:8081 # Mock Server URL or Dummy
+
+cafe24:
+  api:
+    base-url: https://your_mall_id.cafe24api.com
+  client-id: dummy_client_id
+  client-secret: dummy_client_secret
+  access-token: dummy_access_token
+  mall-id: your_mall_id

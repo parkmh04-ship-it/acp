@@ -10,12 +10,9 @@ spring:
     sql-dialect: POSTGRES
   jackson:
     property-naming-strategy: SNAKE_CASE
-  flyway:
-    enabled: true
-    clean-disabled: false
-    validate-on-migrate: false
-    schemas:
-      - psp
+  sql:
+    init:
+      mode: never
 
 kakaopay:
   base-url: https://kapi.kakao.com

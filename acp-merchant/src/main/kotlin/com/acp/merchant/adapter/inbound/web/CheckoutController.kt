@@ -1,0 +1,72 @@
+package com.acp.merchant.adapter.inbound.web
+
+import com.acp.merchant.application.port.input.CheckoutUseCase
+import com.acp.merchant.domain.model.CheckoutSession
+import com.acp.schema.checkout.*
+import com.acp.schema.checkout.CheckoutStatus as DtoCheckoutStatus
+import com.acp.merchant.domain.model.CheckoutStatus as DomainCheckoutStatus
+import org.springframework.web.bind.annotation.*
+import java.math.BigDecimal
+
+@RestController
+@RequestMapping("/checkout_sessions")
+class CheckoutController(
+    private val checkoutUseCase: CheckoutUseCase
+) {
+
+    @PostMapping
+    suspend fun createSession(@RequestBody request: CreateCheckoutSessionRequest): CheckoutSessionResponse {
+        val session = checkoutUseCase.createSession(request)
+        return session.toDto()
+    }
+
+    @GetMapping("/{id}")
+    suspend fun getSession(@PathVariable id: String): CheckoutSessionResponse {
+        val session = checkoutUseCase.getSession(id)
+            ?: throw NoSuchElementException("Session not found")
+        return session.toDto()
+    }
+
+    @PostMapping("/{id}/complete")
+    suspend fun completeSession(@PathVariable id: String): CheckoutSessionResponse {
+        val session = checkoutUseCase.completeSession(id)
+        return session.toDto()
+    }
+
+    private fun CheckoutSession.toDto(): CheckoutSessionResponse {
+        return CheckoutSessionResponse(
+            id = this.id,
+            paymentProvider = PaymentProvider(provider = "kakaopay"),
+            status = when (this.status) {
+                DomainCheckoutStatus.NOT_READY -> DtoCheckoutStatus.NOT_READY
+                DomainCheckoutStatus.READY -> DtoCheckoutStatus.READY
+                DomainCheckoutStatus.COMPLETED -> DtoCheckoutStatus.COMPLETED
+                DomainCheckoutStatus.CANCELED -> DtoCheckoutStatus.CANCELED
+            },
+            currency = this.currency,
+            lineItems = this.items.map { item ->
+                LineItem(
+                    id = item.productId,
+                    item = com.acp.schema.checkout.CheckoutItem(
+                        id = item.productId,
+                        quantity = item.quantity
+                    ),
+                    baseAmount = item.totalPrice.toLong(), // Assuming KRW (minor unit = 1)
+                    subtotal = item.totalPrice.toLong(),
+                    tax = 0,
+                    total = item.totalPrice.toLong()
+                )
+            },
+            totals = listOf(
+                Total(TotalType.ITEMS_BASE_AMOUNT, "상품 금액", this.totals.itemsBaseAmount.toLong()),
+                Total(TotalType.SUBTOTAL, "소계", this.totals.subtotal.toLong()),
+                Total(TotalType.TAX, "부가세", this.totals.tax.toLong()),
+                Total(TotalType.FULFILLMENT, "배송비", this.totals.shipping.toLong()),
+                Total(TotalType.TOTAL, "총 결제 금액", this.totals.total.toLong())
+            ),
+            messages = emptyList(),
+            links = emptyList(),
+            nextActionUrl = this.nextActionUrl
+        )
+    }
+}
