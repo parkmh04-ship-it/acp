@@ -27,6 +27,12 @@ class CheckoutController(
         return session.toDto()
     }
 
+    @PostMapping("/{id}")
+    suspend fun updateSession(@PathVariable id: String, @RequestBody request: UpdateCheckoutSessionRequest): CheckoutSessionResponse {
+        val session = checkoutUseCase.updateSession(id, request)
+        return session.toDto()
+    }
+
     @PostMapping("/{id}/complete")
     suspend fun completeSession(@PathVariable id: String): CheckoutSessionResponse {
         val session = checkoutUseCase.completeSession(id)

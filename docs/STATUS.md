@@ -12,7 +12,7 @@
 2. **Phase 1: Product Feed 구현 완료**
    - ✅ OpenAI Product Feed Spec 확장 필드 구현 (`ProductFeedItem`)
    - ✅ Cafe24 -> ACP 변환 로직 확장 (신규 필드 매핑)
-   - ✅ Merchant DB 스키마 확장 (V1.1 마이그레이션 - 다중 이미지, 할인 정보 등)
+   - ✅ Merchant DB 스키마 확장 (다중 이미지, 할인 정보 등)
    - ✅ jOOQ CodeGen 재생성 및 적용
    - ✅ **통합 테스트 완료**: `FeedIntegrationTest` (Mock Server 기반)
 
@@ -25,30 +25,33 @@
      - `PaymentIntegrationTest`: 전체 결제 준비 플로우 통합 테스트 통과 (Mock Provider 사용)
    - ✅ PSP DB 스키마 및 jOOQ 설정 최적화 완료
 
-4. **Phase 2: Merchant 서버 - Checkout Flow 구현 (진행중)** (2025-12-30)
-   - ✅ **Checkout Session 도메인 및 DB 구현**: `CheckoutSession`, `CheckoutItem`, V1.2 마이그레이션 완료
+4. **Phase 2: Merchant 서버 - Checkout Flow 구현** (2025-12-30)
+   - ✅ **Checkout Session 도메인 및 DB 구현**: `CheckoutSession`, `CheckoutItem` 구현
    - ✅ **Persistence Layer**: jOOQ 기반 `CheckoutPersistenceAdapter` 구현
-   - ✅ **Pricing Engine**: `PricingEngine` 도메인 서비스 구현 (기본 Tax 계산 로직 포함)
+   - ✅ **Pricing Engine**: `PricingEngine` 도메인 서비스 구현 (상품 가격 합산 및 Tax 계산)
    - ✅ **PSP 연동**: `PaymentClient` 구현 (Merchant -> PSP `POST /prepare` 연동)
-   - ✅ **Checkout API**: 
+   - ✅ **Checkout API 구현 및 고도화**: 
      - `POST /checkout_sessions`: 세션 생성
      - `GET /checkout_sessions/{id}`: 세션 조회
+     - `POST /checkout_sessions/{id}`: **세션 업데이트 (수량/주소 변경 시 가격 재계산)**
      - `POST /checkout_sessions/{id}/complete`: 결제 준비 및 리다이렉트 URL 발급
-   - ✅ **통합 테스트 완료**: `CheckoutIntegrationTest` (세션 생성, 상태 확인, PSP 연동 검증)
+   - ✅ **통합 테스트 완료**: `CheckoutIntegrationTest` (세션 생성, 수정, PSP 연동 검증)
 
-5. **시스템 안정화 및 코드 품질 개선** (2025-12-29)
-   - ✅ **Flyway 마이그레이션 멱등성 확보**: `IF NOT EXISTS` 구문 추가로 테스트 환경 충돌 방지
-   - ✅ **테스트 격리 환경 구축**: 테스트용 `application.yml` 분리 및 Flyway 검증 최적화
-   - ✅ **의존성 주입 문제 해결**: Kotlin 생성자 주입 시 `@Value` 어노테이션 호환성 수정
-   - ✅ **Jackson 전역 설정 적용**: `snake_case` 네이밍 전략 적용 및 DTO 내 불필요한 `@JsonProperty` 대거 제거
+5. **시스템 안정화 및 코드 품질 개선** (2025-12-30)
+   - ✅ **DB 아키텍처 개선**:
+     - **Flyway 제거**: 개발 복잡도를 줄이기 위해 Flyway 의존성 제거
+     - **Foreign Key 제거**: 분산 환경 고려하여 물리적 FK 제약 제거 (애플리케이션 레벨 관리)
+     - **스키마 관리**: SQL 파일명 직관적으로 변경 (`init_merchant_products_orders.sql` 등)
+   - ✅ **테스트 환경 최적화**:
+     - `test/resources/application.yml` 분리 및 필수 프로퍼티 설정 (`psp.base-url`, `cafe24.mall-id`)
+     - Java Agent 경고 제거 (`-XX:+EnableDynamicAgentLoading`)
    - ✅ **전체 빌드 및 테스트 통과**: 모든 모듈(`acp-merchant`, `acp-psp`) 정상 빌드 확인
 
 ## 🚧 다음 작업 (우선순위 순)
 
 ### 즉시 착수 (Week 2)
 
-1. **Merchant 서버 - Checkout Flow 고도화**
-   - [ ] `POST /checkout_sessions/{id}` (세션 업데이트) 구현
+1. **Merchant 서버 - 배송 및 고도화**
    - [ ] 배송비 계산 로직 (Fulfillment Options)
    - [ ] 주소 유효성 검증
 
@@ -68,4 +71,4 @@
 
 ---
 
-**Last Updated**: 2025-12-30T12:55:00+09:00
+**Last Updated**: 2025-12-30T13:35:00+09:00

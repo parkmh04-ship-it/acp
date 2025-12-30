@@ -13,6 +13,7 @@ data class CheckoutSession(
     val totals: Totals = Totals.ZERO,
     val nextActionUrl: String? = null,
     val createdAt: ZonedDateTime = ZonedDateTime.now(),
+    val updatedAt: ZonedDateTime = ZonedDateTime.now(),
     val expiresAt: ZonedDateTime? = null
 ) {
     fun isReadyForPayment(): Boolean {

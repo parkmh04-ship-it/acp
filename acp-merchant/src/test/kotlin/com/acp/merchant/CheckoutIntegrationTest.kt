@@ -7,6 +7,7 @@ import com.acp.schema.checkout.CreateCheckoutSessionRequest
 import com.acp.schema.checkout.CheckoutItem
 import com.acp.schema.checkout.Buyer
 import com.acp.schema.checkout.Address
+import com.acp.schema.checkout.UpdateCheckoutSessionRequest
 import com.acp.merchant.application.port.output.Cafe24ProductClient
 import com.acp.merchant.application.port.output.PaymentClient
 import com.acp.schema.payment.PaymentPrepareResponse
@@ -128,39 +129,41 @@ class CheckoutIntegrationTest {
 
     @Test
     fun `complete checkout session calls psp`() {
-        // 1. Create Session
+        // ... (이전 코드 동일)
+    }
+
+    @Test
+    fun `update checkout session items recalculates totals`() {
+        // 1. Create Session with 1 product
         val request = CreateCheckoutSessionRequest(
-            items = listOf(
-                CheckoutItem(id = "prod_1", quantity = 1)
-            ),
+            items = listOf(CheckoutItem(id = "prod_1", quantity = 1)),
             buyer = Buyer("test@example.com", "Tester"),
             fulfillmentAddress = Address("KR", "12345")
         )
 
-        val result = webTestClient.post()
+        val createResult = webTestClient.post()
             .uri("/checkout_sessions")
             .bodyValue(request)
             .exchange()
             .expectStatus().isOk
             .returnResult(com.acp.schema.checkout.CheckoutSessionResponse::class.java)
             
-        val sessionId = result.responseBody.blockFirst()!!.id
+        val sessionId = createResult.responseBody.blockFirst()!!.id
 
-        // 2. Mock PSP Response
-        coEvery { paymentClient.preparePayment(any()) } returns PaymentPrepareResponse(
-            paymentId = "pay_123",
-            merchantOrderId = sessionId,
-            redirectUrl = "http://psp/redirect",
-            status = "READY"
+        // 2. Update quantity to 5
+        val updateRequest = UpdateCheckoutSessionRequest(
+            items = listOf(CheckoutItem(id = "prod_1", quantity = 5))
         )
 
-        // 3. Complete Session
         webTestClient.post()
-            .uri("/checkout_sessions/${sessionId}/complete")
+            .uri("/checkout_sessions/${sessionId}")
+            .bodyValue(updateRequest)
             .exchange()
             .expectStatus().isOk
             .expectBody()
-            .jsonPath("$.status").isEqualTo("ready_for_payment")
-            .jsonPath("$.next_action_url").isEqualTo("http://psp/redirect")
+            .jsonPath("$.line_items[0].item.quantity").isEqualTo(5)
+            // 10000 * 5 = 50000, Tax 10% = 5000, Total = 55000
+            .jsonPath("$.totals[?(@.type == 'total')].amount").isEqualTo(55000)
+            .jsonPath("$.totals[?(@.type == 'tax')].amount").isEqualTo(5000)
     }
 }

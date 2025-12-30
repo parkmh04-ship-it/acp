@@ -7,6 +7,7 @@ import com.acp.merchant.application.port.output.ProductPersistencePort
 import com.acp.merchant.domain.model.*
 import com.acp.merchant.domain.service.PricingEngine
 import com.acp.schema.checkout.CreateCheckoutSessionRequest
+import com.acp.schema.checkout.UpdateCheckoutSessionRequest
 import com.acp.schema.payment.PaymentPrepareRequest
 import com.acp.schema.payment.PaymentItem as PaymentRequestItem
 import org.springframework.stereotype.Service
@@ -26,8 +27,6 @@ class CheckoutService(
             val product = productRepository.findById(requestItem.id)
                 ?: throw IllegalArgumentException("Product not found: ${requestItem.id}")
             
-            // TODO: Check inventory availability
-            
             val unitPrice = product.priceAmount ?: throw IllegalStateException("Product price missing")
             val totalPrice = unitPrice.multiply(java.math.BigDecimal(requestItem.quantity))
             
@@ -46,7 +45,7 @@ class CheckoutService(
         val session = CheckoutSession(
             id = UUID.randomUUID().toString(),
             status = CheckoutStatus.NOT_READY,
-            currency = "KRW", // Default for now, should come from products or request
+            currency = "KRW",
             items = checkoutItems,
             buyer = request.buyer?.let { Buyer(it.email, it.name) },
             shippingAddress = request.fulfillmentAddress?.let { Address(it.countryCode, it.postal_code) },
@@ -61,6 +60,55 @@ class CheckoutService(
         return checkoutRepository.findById(id)
     }
 
+    override suspend fun updateSession(id: String, request: UpdateCheckoutSessionRequest): CheckoutSession {
+        val existingSession = checkoutRepository.findById(id)
+            ?: throw NoSuchElementException("Session not found: $id")
+
+        if (existingSession.status != CheckoutStatus.NOT_READY && existingSession.status != CheckoutStatus.READY) {
+            throw IllegalStateException("Cannot update session in status: ${existingSession.status}")
+        }
+
+        // 1. Update Items if provided
+        val updatedItems = if (request.items != null) {
+             request.items!!.map { requestItem ->
+                val product = productRepository.findById(requestItem.id)
+                    ?: throw IllegalArgumentException("Product not found: ${requestItem.id}")
+                
+                val unitPrice = product.priceAmount ?: throw IllegalStateException("Product price missing")
+                val totalPrice = unitPrice.multiply(java.math.BigDecimal(requestItem.quantity))
+                
+                CheckoutItem(
+                    productId = requestItem.id,
+                    quantity = requestItem.quantity,
+                    unitPrice = unitPrice,
+                    totalPrice = totalPrice
+                )
+            }
+        } else {
+            existingSession.items
+        }
+
+        // 2. Update Buyer and Address
+        val updatedBuyer = request.buyer?.let { Buyer(it.email, it.name) } ?: existingSession.buyer
+        val updatedAddress = request.fulfillmentAddress?.let { Address(it.countryCode, it.postal_code) } ?: existingSession.shippingAddress
+
+        // 3. Recalculate Totals
+        val newTotals = pricingEngine.calculateTotals(updatedItems)
+
+        // 4. Create Updated Session
+        val updatedSession = existingSession.copy(
+            items = updatedItems,
+            buyer = updatedBuyer,
+            shippingAddress = updatedAddress,
+            totals = newTotals,
+            status = if (updatedBuyer != null && updatedAddress != null && updatedItems.isNotEmpty()) 
+                        CheckoutStatus.READY else CheckoutStatus.NOT_READY,
+            updatedAt = java.time.ZonedDateTime.now()
+        )
+
+        return checkoutRepository.save(updatedSession)
+    }
+
     override suspend fun completeSession(id: String): CheckoutSession {
         val session = checkoutRepository.findById(id)
             ?: throw NoSuchElementException("Session not found: $id")
@@ -73,7 +121,7 @@ class CheckoutService(
              throw IllegalStateException("Session not ready for payment. Missing buyer or shipping info.")
         }
 
-        // Fetch product names (N+1 but acceptable for MVP)
+        // Fetch product names
         val paymentItems = session.items.map { item ->
             val product = productRepository.findById(item.productId)
             val name = product?.title ?: "Product ${item.productId}"
@@ -99,7 +147,8 @@ class CheckoutService(
         // Update session
         val updatedSession = session.copy(
             status = CheckoutStatus.READY,
-            nextActionUrl = response.redirectUrl
+            nextActionUrl = response.redirectUrl,
+            updatedAt = java.time.ZonedDateTime.now()
         )
         
         return checkoutRepository.save(updatedSession)

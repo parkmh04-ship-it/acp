@@ -12,6 +12,14 @@ data class CreateCheckoutSessionRequest(
 )
 
 @Serializable
+data class UpdateCheckoutSessionRequest(
+    val items: List<CheckoutItem>? = null,
+    val buyer: Buyer? = null,
+    @SerialName("fulfillment_address")
+    val fulfillmentAddress: Address? = null
+)
+
+@Serializable
 data class CheckoutItem(
     val id: String,
     val quantity: Int
