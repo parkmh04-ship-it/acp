@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.jooq.DSLContext
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -197,6 +198,51 @@ class CheckoutIntegrationTest {
             .expectBody()
             .jsonPath("$.fulfillment_options[?(@.id == 'same_day')]").doesNotExist()
             .jsonPath("$.fulfillment_options[?(@.id == 'standard')]").exists()
+    }
+
+    @Test
+    fun `confirm payment creates order and completes session`() {
+        // 1. Create Session and update to READY
+        val request = CreateCheckoutSessionRequest(
+            items = listOf(CheckoutItem(id = "prod_1", quantity = 1)),
+            buyer = Buyer("test@example.com", "Tester"),
+            fulfillmentAddress = Address("KR", "12345")
+        )
+
+        val session = webTestClient.post()
+            .uri("/checkout_sessions")
+            .bodyValue(request)
+            .exchange()
+            .returnResult(com.acp.schema.checkout.CheckoutSessionResponse::class.java)
+            .responseBody.blockFirst()!!
+
+        webTestClient.post()
+            .uri("/checkout_sessions/${session.id}")
+            .bodyValue(UpdateCheckoutSessionRequest(fulfillmentOptionId = "standard"))
+            .exchange()
+            .expectStatus().isOk
+
+        // 2. Mock PSP Approval
+        coEvery { paymentClient.approvePayment(any()) } returns com.acp.schema.payment.PaymentApproveResponse(
+            paymentId = "PSP-PAY-123",
+            status = "COMPLETED",
+            totalAmount = 14000L, // Item 10000 + Tax 1000 + Ship 3000
+            method = "CARD"
+        )
+
+        // 3. Confirm Payment (새 엔드포인트 POST /checkout_sessions/{id}/confirm 예정)
+        webTestClient.post()
+            .uri("/checkout_sessions/${session.id}/confirm")
+            .bodyValue(mapOf("pg_token" to "DUMMY-TOKEN"))
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.status").isEqualTo("COMPLETED")
+
+        // 4. Verify order in DB (Optional, but good)
+        val orderRecord = dsl.selectFrom(ORDERS).fetchOne()
+        assertNotNull(orderRecord)
+        assertEquals("test@example.com", orderRecord?.userId)
     }
 
     @Test

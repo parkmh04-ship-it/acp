@@ -45,20 +45,18 @@ class PaymentService(
 
                 // 3. 결제 정보 생성 및 DB 저장 (불변: INSERT)
                 val paymentId = UUID.randomUUID().toString()
-                val payment =
-                        Payments(
-                                id = paymentId,
-                                merchantOrderId = request.merchantOrderId,
-                                orgPaymentId = null,
-                                type = "PREPARE",
-                                status = "READY",
-                                amount = request.amount,
-                                taxFreeAmount = 0L, // TODO: 요청에 포함되면 매핑
-                                currency = request.currency,
-                                pgProvider = paymentProvider.providerName,
-                                pgTid = prepareResult.pgTid,
-                                createdAt = OffsetDateTime.now()
-                        )
+                val payment = Payments(
+                    id = paymentId,
+                    merchantOrderId = request.merchantOrderId,
+                    orgPaymentId = null,
+                    type = "PREPARE",
+                    status = "READY",
+                    amount = request.amount,
+                    currency = request.currency,
+                    pgProvider = paymentProvider.providerName,
+                    pgTid = prepareResult.pgTid,
+                    createdAt = OffsetDateTime.now()
+                )
 
                 paymentRepositoryPort.save(payment)
 
@@ -100,7 +98,7 @@ class PaymentService(
                         type = "APPROVE",
                         status = "SUCCESS",
                         amount = approval.amount,
-                        currency = prepareRecord.currency, // 원본 통화 유지
+                        currency = prepareRecord.currency,
                         pgProvider = paymentProvider.providerName,
                         pgTid = approval.pgTid,
                         paymentMethodType = approval.paymentMethod,
@@ -125,8 +123,7 @@ class PaymentService(
                     if (isNetworkError(e)) {
                         handleNetCancel(prepareRecord)
                     }
-                    // 실패 기록도 남겨야 하나? (사용자 요구: 결제 상태 업데이트보다는 불변)
-                    // 실패 이력도 남기는 것이 좋음.
+                    // 실패 기록 저장
                     val failId = UUID.randomUUID().toString()
                     val failPayment = Payments(
                         id = failId,
@@ -150,11 +147,11 @@ class PaymentService(
             logger.warn { "Executing Net Cancel for payment: ${prepareRecord.pgTid}" }
             try {
                 val statusInfo = paymentProvider.checkStatus(prepareRecord.pgTid!!)
-                if (statusInfo.status == "PAID") { // 카카오페이 쪽은 결제됨
+                if (statusInfo.status == "PAID") {
                     logger.info { "Payment was PAID at PG, canceling now..." }
                     paymentProvider.cancel(
                         prepareRecord.pgTid!!, 
-                        prepareRecord.amount!!.toLong(), 
+                        prepareRecord.amount!!, 
                         "Net Cancel due to system timeout"
                     )
                     
@@ -163,7 +160,7 @@ class PaymentService(
                     val cancelPayment = Payments(
                         id = cancelId,
                         merchantOrderId = prepareRecord.merchantOrderId,
-                        orgPaymentId = prepareRecord.id, // PREPARE 참조 (APPROVE 레코드가 없으므로)
+                        orgPaymentId = prepareRecord.id,
                         type = "CANCEL",
                         status = "SUCCESS",
                         amount = prepareRecord.amount,
@@ -179,7 +176,6 @@ class PaymentService(
                 }
             } catch (e: Exception) {
                 logger.error(e) { "Net Cancel failed!" }
-                // 이 경우 시스템 알람 필요
             }
         }
 

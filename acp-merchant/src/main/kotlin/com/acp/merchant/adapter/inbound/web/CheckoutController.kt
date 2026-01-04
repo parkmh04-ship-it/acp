@@ -39,6 +39,13 @@ class CheckoutController(
         return session.toDto()
     }
 
+    @PostMapping("/{id}/confirm")
+    suspend fun confirmPayment(@PathVariable id: String, @RequestBody request: Map<String, String>): CheckoutSessionResponse {
+        val pgToken = request["pg_token"] ?: throw IllegalArgumentException("pg_token is required")
+        val session = checkoutUseCase.confirmPayment(id, pgToken)
+        return session.toDto()
+    }
+
     private fun CheckoutSession.toDto(): CheckoutSessionResponse {
         return CheckoutSessionResponse(
             id = this.id,

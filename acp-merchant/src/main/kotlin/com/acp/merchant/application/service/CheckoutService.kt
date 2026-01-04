@@ -1,10 +1,7 @@
 package com.acp.merchant.application.service
 
 import com.acp.merchant.application.port.input.CheckoutUseCase
-import com.acp.merchant.application.port.output.CheckoutRepositoryPort
-import com.acp.merchant.application.port.output.PaymentClient
-import com.acp.merchant.application.port.output.ProductPersistencePort
-import com.acp.merchant.application.port.output.OrderRepositoryPort
+import com.acp.merchant.application.port.output.*
 import com.acp.merchant.domain.model.*
 import com.acp.merchant.domain.service.PricingEngine
 import com.acp.merchant.domain.service.ShippingCalculator
@@ -16,6 +13,7 @@ import com.acp.schema.payment.PaymentApproveRequest
 import com.acp.schema.payment.PaymentItem as PaymentRequestItem
 import org.springframework.stereotype.Service
 import java.util.UUID
+import java.time.ZonedDateTime
 
 @Service
 class CheckoutService(
@@ -27,63 +25,6 @@ class CheckoutService(
     private val shippingCalculator: ShippingCalculator,
     private val addressValidator: AddressValidator
 ) : CheckoutUseCase {
-
-    // ... (기존 메서드들 생략, confirmPayment 추가) ...
-
-    override suspend fun confirmPayment(sessionId: String, pgToken: String): CheckoutSession {
-        val session = checkoutRepository.findById(sessionId)
-            ?: throw NoSuchElementException("Session not found: $sessionId")
-
-        if (session.status == CheckoutStatus.COMPLETED) {
-            return session
-        }
-
-        if (session.status != CheckoutStatus.READY) {
-            throw IllegalStateException("Session is not ready for payment completion")
-        }
-
-        // 1. Call PSP to approve payment
-        val approveResponse = paymentClient.approvePayment(
-            PaymentApproveRequest(
-                merchantOrderId = session.id,
-                pgToken = pgToken
-            )
-        )
-
-        if (approveResponse.status != "COMPLETED") {
-            throw IllegalStateException("Payment approval failed: ${approveResponse.status}")
-        }
-
-        // 2. Create Order
-        val order = Order(
-            id = UUID.randomUUID().toString(),
-            userId = session.buyer?.email ?: "guest", // TODO: Auth info
-            status = OrderStatus.COMPLETED,
-            totalAmount = session.totals.total,
-            currency = session.currency,
-            paymentRequestIds = approveResponse.paymentId,
-            items = session.items.map { 
-                OrderLineItem(
-                    productId = it.productId,
-                    productName = "Product ${it.productId}", // TODO: Fetch real name
-                    quantity = it.quantity,
-                    unitPrice = it.unitPrice,
-                    totalPrice = it.totalPrice
-                )
-            }
-        )
-        orderRepository.save(order)
-
-        // 3. Update Session
-        val completedSession = session.copy(
-            status = CheckoutStatus.COMPLETED,
-            updatedAt = java.time.ZonedDateTime.now()
-        )
-        
-        return checkoutRepository.save(completedSession)
-    }
-// ...
-}
 
     override suspend fun createSession(request: CreateCheckoutSessionRequest): CheckoutSession {
         // 1. Fetch products and validate
@@ -102,12 +43,11 @@ class CheckoutService(
             )
         }
         
-        // 2. Calculate Totals (Initial shipping is 0)
+        // 2. Calculate Totals
         val totals = pricingEngine.calculateTotals(checkoutItems)
 
         // 3. Determine Available Fulfillment Options
         val address = request.fulfillmentAddress?.let { Address(it.countryCode, it.postalCode) }
-        println("DEBUG: Request Address = $address")
         
         if (address != null) {
             val validationResult = addressValidator.validate(address)
@@ -117,9 +57,7 @@ class CheckoutService(
         }
 
         val availableOptions = if (address != null) {
-            val options = shippingCalculator.getAvailableFulfillmentOptions(checkoutItems, address, totals.itemsBaseAmount)
-            println("DEBUG: Calculated Options = ${options.size}")
-            options
+            shippingCalculator.getAvailableFulfillmentOptions(checkoutItems, address, totals.itemsBaseAmount)
         } else {
             emptyList()
         }
@@ -136,14 +74,12 @@ class CheckoutService(
             totals = totals
         )
         
-        // 5. Save
         return checkoutRepository.save(session)
     }
 
     override suspend fun getSession(id: String): CheckoutSession? {
         val session = checkoutRepository.findById(id) ?: return null
         
-        // availableFulfillmentOptions are not persisted, so recalculate on the fly
         return if (session.shippingAddress != null) {
             session.copy(
                 availableFulfillmentOptions = shippingCalculator.getAvailableFulfillmentOptions(
@@ -165,7 +101,7 @@ class CheckoutService(
             throw IllegalStateException("Cannot update session in status: ${existingSession.status}")
         }
 
-        // 1. Update Items if provided
+        // 1. Update Items
         val updatedItems = if (request.items != null) {
              request.items!!.map { requestItem ->
                 val product = productRepository.findById(requestItem.id)
@@ -196,7 +132,7 @@ class CheckoutService(
             }
         }
 
-        // 3. Recalculate Available Options (if address or items changed)
+        // 3. Recalculate Available Options
         val itemsChanged = updatedItems != existingSession.items
         val addressChanged = updatedAddress != existingSession.shippingAddress
         
@@ -204,16 +140,12 @@ class CheckoutService(
         var selectedOptionId = existingSession.selectedFulfillmentOption
         
         if (itemsChanged || addressChanged) {
-            val tempTotals = pricingEngine.calculateTotals(updatedItems) // Base amount for threshold check
+            val tempTotals = pricingEngine.calculateTotals(updatedItems)
             availableOptions = if (updatedAddress != null) {
                 shippingCalculator.getAvailableFulfillmentOptions(updatedItems, updatedAddress, tempTotals.itemsBaseAmount)
             } else {
                 emptyList()
             }
-            
-            // If address changed, reset selection to force re-selection or default logic
-            // Ideally, we could try to keep the same option if still available, but costs might differ.
-            // For MVP simplicity: reset selection if address changes.
             if (addressChanged) {
                 selectedOptionId = null
             }
@@ -221,7 +153,6 @@ class CheckoutService(
 
         // 4. Handle Option Selection
         if (request.fulfillmentOptionId != null) {
-            // Validate if option is available
             val isAvailable = availableOptions.any { it.id == request.fulfillmentOptionId }
             if (!isAvailable) {
                 throw IllegalArgumentException("Fulfillment option not available: ${request.fulfillmentOptionId}")
@@ -232,8 +163,6 @@ class CheckoutService(
         // 5. Calculate Shipping Cost
         var shippingCost = java.math.BigDecimal.ZERO
         if (selectedOptionId != null && updatedAddress != null) {
-            // We use the calculator again or find from available options.
-            // Using calculator ensures latest logic.
              shippingCost = shippingCalculator.calculateShippingCost(
                  selectedOptionId,
                  pricingEngine.calculateTotals(updatedItems).itemsBaseAmount,
@@ -244,7 +173,7 @@ class CheckoutService(
         // 6. Recalculate Totals
         val newTotals = pricingEngine.calculateTotals(updatedItems, shippingCost)
 
-        // 7. Create Updated Session
+        // 7. Save Updated Session
         val updatedSession = existingSession.copy(
             items = updatedItems,
             buyer = updatedBuyer,
@@ -254,7 +183,7 @@ class CheckoutService(
             totals = newTotals,
             status = if (updatedBuyer != null && updatedAddress != null && updatedItems.isNotEmpty() && selectedOptionId != null) 
                         CheckoutStatus.READY else CheckoutStatus.NOT_READY,
-            updatedAt = java.time.ZonedDateTime.now()
+            updatedAt = ZonedDateTime.now()
         )
 
         return checkoutRepository.save(updatedSession)
@@ -272,7 +201,6 @@ class CheckoutService(
              throw IllegalStateException("Session not ready for payment. Missing buyer or shipping info.")
         }
 
-        // Fetch product names
         val paymentItems = session.items.map { item ->
             val product = productRepository.findById(item.productId)
             val name = product?.title ?: "Product ${item.productId}"
@@ -285,7 +213,6 @@ class CheckoutService(
              )
         }
 
-        // Call PSP
         val request = PaymentPrepareRequest(
             merchantOrderId = session.id,
             amount = session.totals.total.toLong(),
@@ -295,13 +222,62 @@ class CheckoutService(
 
         val response = paymentClient.preparePayment(request)
 
-        // Update session
         val updatedSession = session.copy(
             status = CheckoutStatus.READY,
             nextActionUrl = response.redirectUrl,
-            updatedAt = java.time.ZonedDateTime.now()
+            updatedAt = ZonedDateTime.now()
         )
         
         return checkoutRepository.save(updatedSession)
+    }
+
+    override suspend fun confirmPayment(sessionId: String, pgToken: String): CheckoutSession {
+        val session = checkoutRepository.findById(sessionId)
+            ?: throw NoSuchElementException("Session not found: $sessionId")
+
+        if (session.status == CheckoutStatus.COMPLETED) {
+            return session
+        }
+
+        if (session.status != CheckoutStatus.READY) {
+            throw IllegalStateException("Session is not ready for payment completion")
+        }
+
+        val approveResponse = paymentClient.approvePayment(
+            PaymentApproveRequest(
+                merchantOrderId = session.id,
+                pgToken = pgToken
+            )
+        )
+
+        if (approveResponse.status != "COMPLETED") {
+            throw IllegalStateException("Payment approval failed: ${approveResponse.status}")
+        }
+
+        val order = Order(
+            id = UUID.randomUUID().toString(),
+            userId = session.buyer?.email ?: "guest",
+            status = OrderStatus.COMPLETED,
+            totalAmount = session.totals.total,
+            currency = session.currency,
+            paymentRequestIds = approveResponse.paymentId,
+            items = session.items.map { 
+                OrderLineItem(
+                    productId = it.productId,
+                    productName = "Product ${it.productId}",
+                    quantity = it.quantity,
+                    unitPrice = it.unitPrice,
+                    totalPrice = it.totalPrice
+                )
+            }
+        )
+        orderRepository.save(order)
+
+        val completedSession = session.copy(
+            status = CheckoutStatus.COMPLETED,
+            updatedAt = ZonedDateTime.now()
+        )
+        
+        return checkoutRepository.save(completedSession)
     }
 }
