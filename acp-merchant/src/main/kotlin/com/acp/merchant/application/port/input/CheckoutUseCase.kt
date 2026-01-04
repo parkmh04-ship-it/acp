@@ -9,4 +9,5 @@ interface CheckoutUseCase {
     suspend fun getSession(id: String): CheckoutSession?
     suspend fun updateSession(id: String, request: UpdateCheckoutSessionRequest): CheckoutSession
     suspend fun completeSession(id: String): CheckoutSession
+    suspend fun confirmPayment(sessionId: String, pgToken: String): CheckoutSession
 }

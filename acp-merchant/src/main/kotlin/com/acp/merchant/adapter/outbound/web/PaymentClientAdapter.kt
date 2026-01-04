@@ -3,6 +3,8 @@ package com.acp.merchant.adapter.outbound.web
 import com.acp.merchant.application.port.output.PaymentClient
 import com.acp.schema.payment.PaymentPrepareRequest
 import com.acp.schema.payment.PaymentPrepareResponse
+import com.acp.schema.payment.PaymentApproveRequest
+import com.acp.schema.payment.PaymentApproveResponse
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
@@ -21,6 +23,14 @@ class PaymentClientAdapter(
     override suspend fun preparePayment(request: PaymentPrepareRequest): PaymentPrepareResponse {
         return webClient.post()
             .uri("/api/v1/payments/prepare")
+            .bodyValue(request)
+            .retrieve()
+            .awaitBody()
+    }
+
+    override suspend fun approvePayment(request: PaymentApproveRequest): PaymentApproveResponse {
+        return webClient.post()
+            .uri("/api/v1/payments/approve")
             .bodyValue(request)
             .retrieve()
             .awaitBody()

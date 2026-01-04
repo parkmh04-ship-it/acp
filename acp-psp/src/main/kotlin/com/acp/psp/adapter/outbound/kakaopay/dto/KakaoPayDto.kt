@@ -63,3 +63,55 @@ data class KakaoPayCardInfo(
         val installMonth: String, // 할부 개월 수
         val approvedId: String // 카드사 승인번호
 )
+
+/** 카카오페이 결제 조회 요청 */
+data class KakaoPayOrderRequest(
+        val cid: String,
+        val tid: String
+)
+
+/** 카카오페이 결제 조회 응답 */
+data class KakaoPayOrderResponse(
+        val tid: String,
+        val cid: String,
+        val status: String, // READY, SEND_TMS, OPEN_PAYMENT, SELECT_METHOD, ARS_WAITING, AUTH_PASSWORD, ISSUED_SID, SUCCESS_PAYMENT, PART_CANCEL_PAYMENT, CANCEL_PAYMENT, FAIL_PAYMENT
+        val partnerOrderId: String,
+        val partnerUserId: String,
+        val paymentMethodType: String?,
+        val amount: KakaoPayAmount?,
+        val canceledAmount: KakaoPayAmount?,
+        val cancelAvailableAmount: KakaoPayAmount?,
+        val itemName: String?,
+        val quantity: Int?,
+        val approvedAt: String?,
+        val canceledAt: String?,
+        val selectedCardInfo: KakaoPayCardInfo?
+)
+
+/** 카카오페이 결제 취소 요청 */
+data class KakaoPayCancelRequest(
+        val cid: String,
+        val tid: String,
+        val cancelAmount: Int,
+        val cancelTaxFreeAmount: Int
+)
+
+/** 카카오페이 결제 취소 응답 */
+data class KakaoPayCancelResponse(
+        val aid: String, // 요청 고유 번호
+        val tid: String, // 결제 고유 번호
+        val cid: String, // 가맹점 코드
+        val status: String, // 결제 상태
+        val partnerOrderId: String, // 가맹점 주문번호
+        val partnerUserId: String, // 가맹점 회원 id
+        val paymentMethodType: String, // 결제 수단
+        val amount: KakaoPayAmount, // 결제 금액 정보
+        val approvedCancelAmount: KakaoPayAmount?, // 이번 요청으로 취소된 금액
+        val canceledAmount: KakaoPayAmount?, // 누적 취소 금액
+        val cancelAvailableAmount: KakaoPayAmount?, // 남은 취소 가능 금액
+        val itemName: String?,
+        val quantity: Int?,
+        val createdAt: String, // 결제 준비 요청 시각
+        val approvedAt: String?, // 결제 승인 시각
+        val canceledAt: String? // 결제 취소 시각
+)

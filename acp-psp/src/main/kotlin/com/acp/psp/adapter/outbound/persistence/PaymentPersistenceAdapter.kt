@@ -16,13 +16,25 @@ class PaymentPersistenceAdapter(private val dsl: DSLContext) : PaymentRepository
             withContext(Dispatchers.IO) {
                 dsl.selectFrom(PAYMENTS)
                         .where(PAYMENTS.MERCHANT_ORDER_ID.eq(merchantOrderId))
+                        .orderBy(PAYMENTS.CREATED_AT.desc())
+                        .limit(1)
+                        .fetchOneInto(Payments::class.java)
+            }
+
+    override suspend fun findLastByMerchantOrderIdAndType(merchantOrderId: String, type: String): Payments? =
+            withContext(Dispatchers.IO) {
+                dsl.selectFrom(PAYMENTS)
+                        .where(PAYMENTS.MERCHANT_ORDER_ID.eq(merchantOrderId))
+                        .and(PAYMENTS.TYPE.eq(type))
+                        .orderBy(PAYMENTS.CREATED_AT.desc())
+                        .limit(1)
                         .fetchOneInto(Payments::class.java)
             }
 
     override suspend fun save(payment: Payments): Unit =
             withContext(Dispatchers.IO) {
                 val record = dsl.newRecord(PAYMENTS, payment)
-                dsl.insertInto(PAYMENTS).set(record).onDuplicateKeyUpdate().set(record).execute()
+                dsl.insertInto(PAYMENTS).set(record).execute()
                 Unit
             }
 }

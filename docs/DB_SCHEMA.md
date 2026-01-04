@@ -390,105 +390,72 @@ CREATE INDEX idx_session_items_session_id ON merchant.checkout_session_items(ses
 
 ## 💳 PSP 도메인 (Schema: `psp`)
 
-### 1. `payments` - 결제 트랜잭션
+### 1. `payments` - 결제 트랜잭션 (Immutable Ledger)
+
+결제 상태 변경이 아닌, 모든 이벤트(준비, 승인, 취소)가 새로운 행으로 기록되는 불변 장부입니다.
 
 ```sql
 CREATE TABLE psp.payments (
-    -- Primary Key
-    id                      VARCHAR(100) PRIMARY KEY,
+    id                  VARCHAR(100) PRIMARY KEY, -- UUID
+    merchant_order_id   VARCHAR(100) NOT NULL,    -- 가맹점 주문번호 (그룹핑 키)
+    org_payment_id      VARCHAR(100),             -- 원본 결제 ID (취소 시 승인 건 참조)
     
-    -- Merchant Reference (Virtual FK)
-    merchant_order_id       VARCHAR(100) NOT NULL UNIQUE,  -- 멱등성 키
+    -- Transaction Info
+    type                VARCHAR(20) NOT NULL,     -- PREPARE, APPROVE, CANCEL
+    status              VARCHAR(20) NOT NULL,     -- SUCCESS, FAIL, UNKNOWN
     
-    -- Payment Gateway (KakaoPay)
-    pg_provider             VARCHAR(50) NOT NULL DEFAULT 'kakaopay',
-    pg_tid                  VARCHAR(100),  -- 카카오페이 트랜잭션 ID (암호화 저장)
-    pg_aid                  VARCHAR(100),  -- 카카오페이 승인 ID
-    
-    -- Payment Status
-    status                  VARCHAR(20) NOT NULL,  -- READY, IN_PROGRESS, COMPLETED, FAILED, CANCELED
+    -- PG Info
+    pg_provider         VARCHAR(20) NOT NULL DEFAULT 'KAKAOPAY',
+    pg_tid              VARCHAR(100),             -- PG사 트랜잭션 ID
+    pg_token            VARCHAR(255),             -- 승인 토큰 (PREPARE 단계 저장)
     
     -- Amount
-    amount                  BIGINT NOT NULL,
-    currency                VARCHAR(3) NOT NULL DEFAULT 'KRW',
-    tax_free_amount         BIGINT DEFAULT 0,
+    amount              BIGINT NOT NULL,
+    tax_free_amount     BIGINT DEFAULT 0,
+    currency            VARCHAR(3) NOT NULL DEFAULT 'KRW',
     
-    -- Buyer Information
-    partner_user_id         VARCHAR(100) NOT NULL,
+    -- Payment Method Info (역정규화 - 승인 시 저장)
+    payment_method_type VARCHAR(20),              -- CARD, MONEY
+    card_issuer         VARCHAR(50),
+    card_number_masked  VARCHAR(20),
+    installments        INTEGER DEFAULT 0,
     
-    -- Item Information (요약)
-    item_name               VARCHAR(200) NOT NULL,  -- "나이키 에어맥스 270 외 2건"
-    item_quantity           INTEGER NOT NULL,
-    
-    -- Redirect URLs (카카오페이 콜백)
-    approval_url            VARCHAR(2048),
-    cancel_url              VARCHAR(2048),
-    fail_url                VARCHAR(2048),
-    
-    -- Payment Method (승인 후 저장)
-    payment_method_type     VARCHAR(50),  -- CARD, MONEY (카카오머니)
-    card_issuer             VARCHAR(100), -- 카드사 (마스킹)
-    card_number_masked      VARCHAR(20),  -- 카드번호 마스킹 (예: ****-****-****-1234)
-    
-    -- Timestamps
-    created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    approved_at             TIMESTAMP,
-    canceled_at             TIMESTAMP,
-    
-    -- Constraints
-    CONSTRAINT chk_payment_status CHECK (status IN ('READY', 'IN_PROGRESS', 'COMPLETED', 'FAILED', 'CANCELED')),
-    CONSTRAINT chk_amount_positive CHECK (amount > 0)
+    -- Metadata
+    created_at          TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
--- Indexes
 CREATE INDEX idx_payments_merchant_order_id ON psp.payments(merchant_order_id);
-CREATE INDEX idx_payments_status ON psp.payments(status, created_at DESC);
 CREATE INDEX idx_payments_pg_tid ON psp.payments(pg_tid);
-CREATE INDEX idx_payments_created_at ON psp.payments(created_at DESC);
-
-CREATE TRIGGER trg_payments_updated_at
-    BEFORE UPDATE ON psp.payments
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+CREATE INDEX idx_payments_created_at ON psp.payments(created_at);
 ```
 
 ---
 
-### 2. `payment_transactions` - 결제 이벤트 로그 (Audit Trail)
+### 2. `external_payment_transactions` - 외부 연동 로그 (Raw Log)
+
+PG사와의 모든 통신 원본을 저장하여 추적성을 확보합니다.
 
 ```sql
-CREATE TABLE psp.payment_transactions (
-    id                      BIGSERIAL PRIMARY KEY,
-    payment_id              VARCHAR(100) NOT NULL REFERENCES psp.payments(id) ON DELETE CASCADE,
+CREATE TABLE psp.external_payment_transactions (
+    id                  BIGSERIAL PRIMARY KEY,
+    payment_id          VARCHAR(100) NOT NULL, -- 논리적 FK (psp.payments.id)
     
-    -- Transaction Type
-    transaction_type        VARCHAR(50) NOT NULL,  -- PREPARE, APPROVE, CANCEL, REFUND
-    
-    -- Status Transition
-    previous_status         VARCHAR(20),
-    new_status              VARCHAR(20) NOT NULL,
-    
-    -- Amount (부분 취소 대비)
-    amount                  BIGINT,
-    
-    -- External Reference
-    pg_response             JSONB,  -- 카카오페이 응답 원본 (디버깅용)
-    
-    -- Error Info
-    error_code              VARCHAR(50),
-    error_message           TEXT,
+    -- Request/Response Details
+    provider            VARCHAR(50) NOT NULL,
+    url                 VARCHAR(1024) NOT NULL,
+    method              VARCHAR(10) NOT NULL,
+    request_header      TEXT,
+    request_body        JSONB,
+    response_body       JSONB,
+    response_status     INTEGER,
     
     -- Metadata
-    created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by              VARCHAR(100),  -- 시스템 또는 관리자 ID
-    
-    -- Constraints
-    CONSTRAINT chk_transaction_type CHECK (transaction_type IN ('PREPARE', 'APPROVE', 'CANCEL', 'REFUND'))
+    latency_ms          BIGINT,
+    created_at          TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_transactions_payment_id ON psp.payment_transactions(payment_id, created_at DESC);
-CREATE INDEX idx_transactions_type ON psp.payment_transactions(transaction_type, created_at DESC);
+CREATE INDEX idx_ext_trans_payment_id ON psp.external_payment_transactions(payment_id);
+CREATE INDEX idx_ext_trans_created_at ON psp.external_payment_transactions(created_at);
 ```
 
 ---

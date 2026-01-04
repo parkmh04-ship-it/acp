@@ -25,3 +25,27 @@ data class PaymentPrepareResponse(
     val redirectUrl: String, // KakaoPay 'next_redirect_pc_url'
     val status: String // READY
 )
+
+@Serializable
+data class PaymentApproveRequest(
+    val merchantOrderId: String,
+    val pgToken: String
+)
+
+@Serializable
+data class PaymentApproveResponse(
+    val paymentId: String,
+    val status: String,
+    val approvedAt: String? = null,
+    val totalAmount: Long,
+    val method: String? = null, // CARD, MONEY
+    val cardInfo: CardInfo? = null
+)
+
+@Serializable
+data class CardInfo(
+    val issuerName: String,
+    val purchaseName: String? = null,
+    val cardType: String? = null,
+    val installMonth: String? = null
+)

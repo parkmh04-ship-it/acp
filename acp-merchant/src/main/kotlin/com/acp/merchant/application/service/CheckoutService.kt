@@ -4,6 +4,7 @@ import com.acp.merchant.application.port.input.CheckoutUseCase
 import com.acp.merchant.application.port.output.CheckoutRepositoryPort
 import com.acp.merchant.application.port.output.PaymentClient
 import com.acp.merchant.application.port.output.ProductPersistencePort
+import com.acp.merchant.application.port.output.OrderRepositoryPort
 import com.acp.merchant.domain.model.*
 import com.acp.merchant.domain.service.PricingEngine
 import com.acp.merchant.domain.service.ShippingCalculator
@@ -11,6 +12,7 @@ import com.acp.merchant.domain.service.AddressValidator
 import com.acp.schema.checkout.CreateCheckoutSessionRequest
 import com.acp.schema.checkout.UpdateCheckoutSessionRequest
 import com.acp.schema.payment.PaymentPrepareRequest
+import com.acp.schema.payment.PaymentApproveRequest
 import com.acp.schema.payment.PaymentItem as PaymentRequestItem
 import org.springframework.stereotype.Service
 import java.util.UUID
@@ -19,11 +21,69 @@ import java.util.UUID
 class CheckoutService(
     private val checkoutRepository: CheckoutRepositoryPort,
     private val productRepository: ProductPersistencePort,
+    private val orderRepository: OrderRepositoryPort,
     private val paymentClient: PaymentClient,
     private val pricingEngine: PricingEngine,
     private val shippingCalculator: ShippingCalculator,
     private val addressValidator: AddressValidator
 ) : CheckoutUseCase {
+
+    // ... (기존 메서드들 생략, confirmPayment 추가) ...
+
+    override suspend fun confirmPayment(sessionId: String, pgToken: String): CheckoutSession {
+        val session = checkoutRepository.findById(sessionId)
+            ?: throw NoSuchElementException("Session not found: $sessionId")
+
+        if (session.status == CheckoutStatus.COMPLETED) {
+            return session
+        }
+
+        if (session.status != CheckoutStatus.READY) {
+            throw IllegalStateException("Session is not ready for payment completion")
+        }
+
+        // 1. Call PSP to approve payment
+        val approveResponse = paymentClient.approvePayment(
+            PaymentApproveRequest(
+                merchantOrderId = session.id,
+                pgToken = pgToken
+            )
+        )
+
+        if (approveResponse.status != "COMPLETED") {
+            throw IllegalStateException("Payment approval failed: ${approveResponse.status}")
+        }
+
+        // 2. Create Order
+        val order = Order(
+            id = UUID.randomUUID().toString(),
+            userId = session.buyer?.email ?: "guest", // TODO: Auth info
+            status = OrderStatus.COMPLETED,
+            totalAmount = session.totals.total,
+            currency = session.currency,
+            paymentRequestIds = approveResponse.paymentId,
+            items = session.items.map { 
+                OrderLineItem(
+                    productId = it.productId,
+                    productName = "Product ${it.productId}", // TODO: Fetch real name
+                    quantity = it.quantity,
+                    unitPrice = it.unitPrice,
+                    totalPrice = it.totalPrice
+                )
+            }
+        )
+        orderRepository.save(order)
+
+        // 3. Update Session
+        val completedSession = session.copy(
+            status = CheckoutStatus.COMPLETED,
+            updatedAt = java.time.ZonedDateTime.now()
+        )
+        
+        return checkoutRepository.save(completedSession)
+    }
+// ...
+}
 
     override suspend fun createSession(request: CreateCheckoutSessionRequest): CheckoutSession {
         // 1. Fetch products and validate

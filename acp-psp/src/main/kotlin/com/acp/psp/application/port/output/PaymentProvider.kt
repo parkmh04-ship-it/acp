@@ -28,7 +28,15 @@ interface PaymentProvider {
 
     /** 결제 취소 (Cancel) */
     suspend fun cancel(paymentId: String, amount: Long, reason: String): PaymentCancelResult
+
+    /** 결제 상태 조회 (Check Status) */
+    suspend fun checkStatus(pgTid: String): PaymentStatusInfo
 }
+
+data class PaymentStatusInfo(
+    val status: String, // READY, PAID, CANCELED, FAILED
+    val amount: Long? = null
+)
 
 /** 결제 승인 결과 데이터 클래스 */
 data class PaymentApproval(
