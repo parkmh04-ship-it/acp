@@ -16,7 +16,9 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":acp-shared"))
+    implementation(project(":acp-shared")) {
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-serialization-json")
+    }
     
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.validation)

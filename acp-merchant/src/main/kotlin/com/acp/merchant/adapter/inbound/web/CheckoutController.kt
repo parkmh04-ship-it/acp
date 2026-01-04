@@ -57,17 +57,33 @@ class CheckoutController(
                         id = item.productId,
                         quantity = item.quantity
                     ),
-                    baseAmount = item.totalPrice.toLong(), // Assuming KRW (minor unit = 1)
+                    baseAmount = item.totalPrice.toLong(),
                     subtotal = item.totalPrice.toLong(),
                     tax = 0,
                     total = item.totalPrice.toLong()
                 )
             },
-            totals = listOf(
+            fulfillmentOptions = this.availableFulfillmentOptions.map { option ->
+                com.acp.schema.checkout.FulfillmentOption(
+                    id = option.id,
+                    name = option.name,
+                    description = option.description,
+                    estimatedMinDays = option.estimatedMinDays,
+                    estimatedMaxDays = option.estimatedMaxDays,
+                    amount = option.cost.toLong(),
+                    currency = option.currency
+                )
+            },
+            totals = listOfNotNull(
                 Total(TotalType.ITEMS_BASE_AMOUNT, "상품 금액", this.totals.itemsBaseAmount.toLong()),
                 Total(TotalType.SUBTOTAL, "소계", this.totals.subtotal.toLong()),
                 Total(TotalType.TAX, "부가세", this.totals.tax.toLong()),
-                Total(TotalType.FULFILLMENT, "배송비", this.totals.shipping.toLong()),
+                if (this.selectedFulfillmentOption != null) {
+                    val optionName = this.availableFulfillmentOptions.find { it.id == this.selectedFulfillmentOption }?.name ?: "배송비"
+                    Total(TotalType.FULFILLMENT, optionName, this.totals.shipping.toLong())
+                } else if (this.availableFulfillmentOptions.isNotEmpty()) {
+                    Total(TotalType.FULFILLMENT, "배송비 (미선택)", 0)
+                } else null,
                 Total(TotalType.TOTAL, "총 결제 금액", this.totals.total.toLong())
             ),
             messages = emptyList(),

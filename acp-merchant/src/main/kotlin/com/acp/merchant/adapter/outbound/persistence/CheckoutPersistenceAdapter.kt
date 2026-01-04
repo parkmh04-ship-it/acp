@@ -29,6 +29,8 @@ class CheckoutPersistenceAdapter(
                 .set(CHECKOUT_SESSIONS.BUYER_NAME, checkoutSession.buyer?.name)
                 .set(CHECKOUT_SESSIONS.SHIPPING_ADDRESS_COUNTRY, checkoutSession.shippingAddress?.countryCode)
                 .set(CHECKOUT_SESSIONS.SHIPPING_ADDRESS_POSTAL_CODE, checkoutSession.shippingAddress?.postalCode)
+                .set(CHECKOUT_SESSIONS.SELECTED_FULFILLMENT_OPTION, checkoutSession.selectedFulfillmentOption)
+                .set(CHECKOUT_SESSIONS.SHIPPING_COST, checkoutSession.totals.shipping)
                 .set(CHECKOUT_SESSIONS.NEXT_ACTION_URL, checkoutSession.nextActionUrl)
                 .set(CHECKOUT_SESSIONS.CREATED_AT, checkoutSession.createdAt.toOffsetDateTime())
                 .set(CHECKOUT_SESSIONS.UPDATED_AT, java.time.OffsetDateTime.now())
@@ -40,6 +42,8 @@ class CheckoutPersistenceAdapter(
                 .set(CHECKOUT_SESSIONS.BUYER_NAME, checkoutSession.buyer?.name)
                 .set(CHECKOUT_SESSIONS.SHIPPING_ADDRESS_COUNTRY, checkoutSession.shippingAddress?.countryCode)
                 .set(CHECKOUT_SESSIONS.SHIPPING_ADDRESS_POSTAL_CODE, checkoutSession.shippingAddress?.postalCode)
+                .set(CHECKOUT_SESSIONS.SELECTED_FULFILLMENT_OPTION, checkoutSession.selectedFulfillmentOption)
+                .set(CHECKOUT_SESSIONS.SHIPPING_COST, checkoutSession.totals.shipping)
                 .set(CHECKOUT_SESSIONS.NEXT_ACTION_URL, checkoutSession.nextActionUrl)
                 .set(CHECKOUT_SESSIONS.UPDATED_AT, java.time.OffsetDateTime.now())
                 .execute()
@@ -93,6 +97,7 @@ class CheckoutPersistenceAdapter(
             }
             
         val itemsBaseAmount = items.fold(BigDecimal.ZERO) { acc, i -> acc.add(i.totalPrice) }
+        val shippingCost = record.shippingCost ?: BigDecimal.ZERO
 
         CheckoutSession(
             id = record.id!!,
@@ -101,12 +106,13 @@ class CheckoutPersistenceAdapter(
             items = items,
             buyer = if (record.buyerEmail != null || record.buyerName != null) Buyer(record.buyerEmail, record.buyerName) else null,
             shippingAddress = if (record.shippingAddressCountry != null) Address(record.shippingAddressCountry!!, record.shippingAddressPostalCode) else null,
+            selectedFulfillmentOption = record.selectedFulfillmentOption,
             totals = Totals(
                  itemsBaseAmount = itemsBaseAmount,
                  itemsDiscount = BigDecimal.ZERO,
                  subtotal = itemsBaseAmount,
-                 tax = BigDecimal.ZERO, // Placeholder
-                 shipping = BigDecimal.ZERO, // Placeholder
+                 tax = BigDecimal.ZERO, // Placeholder - needs proper calculation or persistence
+                 shipping = shippingCost,
                  total = record.totalAmount!!
             ),
             nextActionUrl = record.nextActionUrl,

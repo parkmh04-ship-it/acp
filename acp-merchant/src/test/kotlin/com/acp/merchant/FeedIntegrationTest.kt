@@ -62,7 +62,8 @@ class FeedIntegrationTest {
             display = "T",
             selling = "T",
             productCondition = "N",
-            stockQuantity = 100
+            stockQuantity = 100,
+            listImage = "http://example.com/image.jpg"
         )
     }
 
@@ -78,6 +79,8 @@ class FeedIntegrationTest {
             .jsonPath("$[0].title").isEqualTo("Classic White T-Shirt")
             // Price format check might be tricky due to BigDecimal toString(), let's check existence
             .jsonPath("$[0].price").isNotEmpty
-            .jsonPath("$[0].availability").isEqualTo("in_stock")
+            .jsonPath("$[0].availability").isEqualTo("IN_STOCK")
+            // Verify snake_case keys
+            .jsonPath("$[0].image_link").isNotEmpty
     }
 }

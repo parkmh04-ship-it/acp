@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: acp-psp
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    deserialization:
+      fail-on-unknown-properties: false
   datasource:
     url: jdbc:postgresql://localhost:5432/acp
     username: user

@@ -6,6 +6,8 @@ import com.acp.merchant.application.port.output.PaymentClient
 import com.acp.merchant.application.port.output.ProductPersistencePort
 import com.acp.merchant.domain.model.*
 import com.acp.merchant.domain.service.PricingEngine
+import com.acp.merchant.domain.service.ShippingCalculator
+import com.acp.merchant.domain.service.AddressValidator
 import com.acp.schema.checkout.CreateCheckoutSessionRequest
 import com.acp.schema.checkout.UpdateCheckoutSessionRequest
 import com.acp.schema.payment.PaymentPrepareRequest
@@ -18,7 +20,9 @@ class CheckoutService(
     private val checkoutRepository: CheckoutRepositoryPort,
     private val productRepository: ProductPersistencePort,
     private val paymentClient: PaymentClient,
-    private val pricingEngine: PricingEngine
+    private val pricingEngine: PricingEngine,
+    private val shippingCalculator: ShippingCalculator,
+    private val addressValidator: AddressValidator
 ) : CheckoutUseCase {
 
     override suspend fun createSession(request: CreateCheckoutSessionRequest): CheckoutSession {
@@ -38,30 +42,63 @@ class CheckoutService(
             )
         }
         
-        // 2. Calculate Totals
+        // 2. Calculate Totals (Initial shipping is 0)
         val totals = pricingEngine.calculateTotals(checkoutItems)
+
+        // 3. Determine Available Fulfillment Options
+        val address = request.fulfillmentAddress?.let { Address(it.countryCode, it.postalCode) }
+        println("DEBUG: Request Address = $address")
         
-        // 3. Create Session
+        if (address != null) {
+            val validationResult = addressValidator.validate(address)
+            if (!validationResult.isValid) {
+                throw IllegalArgumentException(validationResult.errorMessage)
+            }
+        }
+
+        val availableOptions = if (address != null) {
+            val options = shippingCalculator.getAvailableFulfillmentOptions(checkoutItems, address, totals.itemsBaseAmount)
+            println("DEBUG: Calculated Options = ${options.size}")
+            options
+        } else {
+            emptyList()
+        }
+        
+        // 4. Create Session
         val session = CheckoutSession(
             id = UUID.randomUUID().toString(),
             status = CheckoutStatus.NOT_READY,
             currency = "KRW",
             items = checkoutItems,
             buyer = request.buyer?.let { Buyer(it.email, it.name) },
-            shippingAddress = request.fulfillmentAddress?.let { Address(it.countryCode, it.postal_code) },
+            shippingAddress = address,
+            availableFulfillmentOptions = availableOptions,
             totals = totals
         )
         
-        // 4. Save
+        // 5. Save
         return checkoutRepository.save(session)
     }
 
     override suspend fun getSession(id: String): CheckoutSession? {
-        return checkoutRepository.findById(id)
+        val session = checkoutRepository.findById(id) ?: return null
+        
+        // availableFulfillmentOptions are not persisted, so recalculate on the fly
+        return if (session.shippingAddress != null) {
+            session.copy(
+                availableFulfillmentOptions = shippingCalculator.getAvailableFulfillmentOptions(
+                    session.items,
+                    session.shippingAddress,
+                    session.totals.itemsBaseAmount
+                )
+            )
+        } else {
+            session
+        }
     }
 
     override suspend fun updateSession(id: String, request: UpdateCheckoutSessionRequest): CheckoutSession {
-        val existingSession = checkoutRepository.findById(id)
+        val existingSession = getSession(id)
             ?: throw NoSuchElementException("Session not found: $id")
 
         if (existingSession.status != CheckoutStatus.NOT_READY && existingSession.status != CheckoutStatus.READY) {
@@ -90,18 +127,72 @@ class CheckoutService(
 
         // 2. Update Buyer and Address
         val updatedBuyer = request.buyer?.let { Buyer(it.email, it.name) } ?: existingSession.buyer
-        val updatedAddress = request.fulfillmentAddress?.let { Address(it.countryCode, it.postal_code) } ?: existingSession.shippingAddress
+        val updatedAddress = request.fulfillmentAddress?.let { Address(it.countryCode, it.postalCode) } ?: existingSession.shippingAddress
 
-        // 3. Recalculate Totals
-        val newTotals = pricingEngine.calculateTotals(updatedItems)
+        if (updatedAddress != null && updatedAddress != existingSession.shippingAddress) {
+            val validationResult = addressValidator.validate(updatedAddress)
+            if (!validationResult.isValid) {
+                throw IllegalArgumentException(validationResult.errorMessage)
+            }
+        }
 
-        // 4. Create Updated Session
+        // 3. Recalculate Available Options (if address or items changed)
+        val itemsChanged = updatedItems != existingSession.items
+        val addressChanged = updatedAddress != existingSession.shippingAddress
+        
+        var availableOptions = existingSession.availableFulfillmentOptions
+        var selectedOptionId = existingSession.selectedFulfillmentOption
+        
+        if (itemsChanged || addressChanged) {
+            val tempTotals = pricingEngine.calculateTotals(updatedItems) // Base amount for threshold check
+            availableOptions = if (updatedAddress != null) {
+                shippingCalculator.getAvailableFulfillmentOptions(updatedItems, updatedAddress, tempTotals.itemsBaseAmount)
+            } else {
+                emptyList()
+            }
+            
+            // If address changed, reset selection to force re-selection or default logic
+            // Ideally, we could try to keep the same option if still available, but costs might differ.
+            // For MVP simplicity: reset selection if address changes.
+            if (addressChanged) {
+                selectedOptionId = null
+            }
+        }
+
+        // 4. Handle Option Selection
+        if (request.fulfillmentOptionId != null) {
+            // Validate if option is available
+            val isAvailable = availableOptions.any { it.id == request.fulfillmentOptionId }
+            if (!isAvailable) {
+                throw IllegalArgumentException("Fulfillment option not available: ${request.fulfillmentOptionId}")
+            }
+            selectedOptionId = request.fulfillmentOptionId
+        }
+
+        // 5. Calculate Shipping Cost
+        var shippingCost = java.math.BigDecimal.ZERO
+        if (selectedOptionId != null && updatedAddress != null) {
+            // We use the calculator again or find from available options.
+            // Using calculator ensures latest logic.
+             shippingCost = shippingCalculator.calculateShippingCost(
+                 selectedOptionId,
+                 pricingEngine.calculateTotals(updatedItems).itemsBaseAmount,
+                 updatedAddress
+             )
+        }
+
+        // 6. Recalculate Totals
+        val newTotals = pricingEngine.calculateTotals(updatedItems, shippingCost)
+
+        // 7. Create Updated Session
         val updatedSession = existingSession.copy(
             items = updatedItems,
             buyer = updatedBuyer,
             shippingAddress = updatedAddress,
+            availableFulfillmentOptions = availableOptions,
+            selectedFulfillmentOption = selectedOptionId,
             totals = newTotals,
-            status = if (updatedBuyer != null && updatedAddress != null && updatedItems.isNotEmpty()) 
+            status = if (updatedBuyer != null && updatedAddress != null && updatedItems.isNotEmpty() && selectedOptionId != null) 
                         CheckoutStatus.READY else CheckoutStatus.NOT_READY,
             updatedAt = java.time.ZonedDateTime.now()
         )

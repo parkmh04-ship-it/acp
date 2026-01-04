@@ -313,6 +313,7 @@ CREATE TABLE merchant.checkout_sessions (
     fulfillment_amount      BIGINT DEFAULT 0,
     tax_amount              BIGINT DEFAULT 0,
     total_amount            BIGINT NOT NULL,
+    shipping_cost           NUMERIC(19, 2), -- 계산된 배송비 (fulfillment_amount와 중복될 수 있으나 명시적 기록용)
     currency                VARCHAR(3) NOT NULL DEFAULT 'KRW',
     
     -- Fulfillment Address
@@ -595,25 +596,21 @@ class AesGcmEncryptionService(
 
 ---
 
-## 📊 데이터 마이그레이션 (Flyway)
+## 📊 데이터 마이그레이션 (Manual)
 
 ### 마이그레이션 파일 구조
 
+초기 개발 단계의 유연성을 위해 Flyway 대신 수동 SQL 실행 방식을 사용합니다.
+
 ```
 acp-merchant/src/main/resources/db/migration/
-├── V1__create_products.sql
-├── V2__create_product_variants.sql
-├── V3__create_product_images.sql
-├── V4__create_orders.sql
-├── V5__create_order_lines.sql
-├── V6__create_checkout_sessions.sql
-└── V7__create_checkout_session_items.sql
+├── init_merchant_products_orders.sql  -- 상품 및 주문 테이블
+├── create_checkout_sessions.sql       -- 체크아웃 세션
+├── expand_products_spec.sql           -- 상품 스펙 확장 (이미지 등)
+└── add_fulfillment_option.sql         -- 배송 옵션 컬럼 추가
 
 acp-psp/src/main/resources/db/migration/
-├── V1__create_payments.sql
-├── V2__create_payment_transactions.sql
-├── V3__create_payment_partner_meta.sql
-└── V4__create_idempotency_keys.sql
+└── init_psp_payments.sql              -- 결제 관련 테이블
 ```
 
 ---

@@ -121,10 +121,10 @@ class CheckoutIntegrationTest {
             .expectStatus().isOk
             .expectBody()
             .jsonPath("$.id").isNotEmpty
-            .jsonPath("$.status").isEqualTo("not_ready_for_payment")
+            .jsonPath("$.status").isEqualTo("NOT_READY")
             .jsonPath("$.currency").isEqualTo("KRW")
-            .jsonPath("$.totals[?(@.type == 'total')].amount").isEqualTo(44000)
-            .jsonPath("$.totals[?(@.type == 'tax')].amount").isEqualTo(4000)
+            .jsonPath("$.totals[?(@.type == 'TOTAL')].amount").isEqualTo(44000)
+            .jsonPath("$.totals[?(@.type == 'TAX')].amount").isEqualTo(4000)
     }
 
     @Test
@@ -133,8 +133,8 @@ class CheckoutIntegrationTest {
     }
 
     @Test
-    fun `update checkout session items recalculates totals`() {
-        // 1. Create Session with 1 product
+    fun `shipping option selection calculates total`() {
+        // 1. Create Session (Total = 11000)
         val request = CreateCheckoutSessionRequest(
             items = listOf(CheckoutItem(id = "prod_1", quantity = 1)),
             buyer = Buyer("test@example.com", "Tester"),
@@ -150,9 +150,9 @@ class CheckoutIntegrationTest {
             
         val sessionId = createResult.responseBody.blockFirst()!!.id
 
-        // 2. Update quantity to 5
+        // 2. Select Express Shipping (5000 KRW)
         val updateRequest = UpdateCheckoutSessionRequest(
-            items = listOf(CheckoutItem(id = "prod_1", quantity = 5))
+            fulfillmentOptionId = "express"
         )
 
         webTestClient.post()
@@ -161,9 +161,55 @@ class CheckoutIntegrationTest {
             .exchange()
             .expectStatus().isOk
             .expectBody()
-            .jsonPath("$.line_items[0].item.quantity").isEqualTo(5)
-            // 10000 * 5 = 50000, Tax 10% = 5000, Total = 55000
-            .jsonPath("$.totals[?(@.type == 'total')].amount").isEqualTo(55000)
-            .jsonPath("$.totals[?(@.type == 'tax')].amount").isEqualTo(5000)
+            .jsonPath("$.status").isEqualTo("READY")
+            .jsonPath("$.totals[?(@.type == 'FULFILLMENT')].amount").isEqualTo(5000)
+            // Item(10000) + Tax(1000) + Shipping(5000) = 16000
+            .jsonPath("$.totals[?(@.type == 'TOTAL')].amount").isEqualTo(16000)
+    }
+
+    @Test
+    fun `available fulfillment options depend on address`() {
+        // 1. Seoul address (06xxx) should have Same Day shipping
+        val seoulRequest = CreateCheckoutSessionRequest(
+            items = listOf(CheckoutItem(id = "prod_1", quantity = 1)),
+            fulfillmentAddress = Address("KR", "06000")
+        )
+
+        webTestClient.post()
+            .uri("/checkout_sessions")
+            .bodyValue(seoulRequest)
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.fulfillment_options[?(@.id == 'same_day')]").exists()
+
+        // 2. Other address (99xxx) should NOT have Same Day shipping
+        val otherRequest = CreateCheckoutSessionRequest(
+            items = listOf(CheckoutItem(id = "prod_1", quantity = 1)),
+            fulfillmentAddress = Address("KR", "99000")
+        )
+
+        webTestClient.post()
+            .uri("/checkout_sessions")
+            .bodyValue(otherRequest)
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.fulfillment_options[?(@.id == 'same_day')]").doesNotExist()
+            .jsonPath("$.fulfillment_options[?(@.id == 'standard')]").exists()
+    }
+
+    @Test
+    fun `create session with invalid address fails`() {
+        val request = CreateCheckoutSessionRequest(
+            items = listOf(CheckoutItem(id = "prod_1", quantity = 1)),
+            fulfillmentAddress = Address("KR", "123") // Invalid postal code
+        )
+
+        webTestClient.post()
+            .uri("/checkout_sessions")
+            .bodyValue(request)
+            .exchange()
+            .expectStatus().is5xxServerError
     }
 }

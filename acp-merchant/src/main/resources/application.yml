@@ -12,6 +12,11 @@ spring:
     sql-dialect: POSTGRES
   jackson:
     property-naming-strategy: SNAKE_CASE
+    serialization:
+      WRITE_ENUMS_USING_TO_STRING: true
+    deserialization:
+      fail-on-unknown-properties: false
+      READ_ENUMS_USING_TO_STRING: true
 
 psp:
   base-url: http://localhost:8081

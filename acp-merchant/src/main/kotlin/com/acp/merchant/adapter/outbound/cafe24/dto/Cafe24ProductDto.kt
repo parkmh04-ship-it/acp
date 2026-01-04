@@ -64,10 +64,10 @@ data class Category(
 )
 
 data class CategoryName(
-        @JsonProperty("1") val depth1: String? = null,
-        @JsonProperty("2") val depth2: String? = null,
-        @JsonProperty("3") val depth3: String? = null,
-        @JsonProperty("4") val depth4: String? = null
+        val depth1: String? = null,
+        val depth2: String? = null,
+        val depth3: String? = null,
+        val depth4: String? = null
 )
 
 data class ProductOption(

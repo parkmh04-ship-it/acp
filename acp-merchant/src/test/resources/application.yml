@@ -6,6 +6,10 @@ spring:
     url: jdbc:postgresql://localhost:5432/acp
     username: user
     password: password
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    deserialization:
+      fail-on-unknown-properties: false
   sql:
     init:
       mode: never
