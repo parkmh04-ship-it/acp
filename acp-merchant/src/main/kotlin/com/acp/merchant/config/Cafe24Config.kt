@@ -1,5 +1,6 @@
 package com.acp.merchant.config
 
+import com.acp.merchant.infrastructure.cafe24.Cafe24TokenManager
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
@@ -18,7 +19,9 @@ private val logger = KotlinLogging.logger {}
  * Cafe24 API 호출을 위한 WebClient 및 관련 설정을 제공합니다.
  */
 @Configuration(proxyBeanMethods = false)
-class Cafe24Config {
+class Cafe24Config(
+    private val tokenManager: Cafe24TokenManager
+) {
 
     @field:Value("\${cafe24.api.base-url}")
     lateinit var baseUrl: String
@@ -29,37 +32,34 @@ class Cafe24Config {
     @field:Value("\${cafe24.client-secret}")
     lateinit var clientSecret: String
 
-    @field:Value("\${cafe24.access-token:}")
-    lateinit var accessToken: String
-
     /**
      * Cafe24 API 호출용 WebClient
      *
      * - Base URL: Cafe24 API 엔드포인트
-     * - Authorization: Bearer 토큰 인증
+     * - Authorization: Bearer 토큰 인증 (동적 주입)
      * - Content-Type: application/json
-     * - Timeout: 10초
      */
     @Bean
     fun cafe24WebClient(): WebClient {
         logger.info { "Initializing Cafe24 WebClient with baseUrl: $baseUrl" }
 
-        val builder =
-            WebClient.builder()
-                .baseUrl(baseUrl)
-                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-
-        if (accessToken.isNotBlank()) {
-            logger.info { "Access token configured for Cafe24 API" }
-            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-        } else {
-            logger.warn { "No access token configured. API calls may fail." }
-        }
-
-        return builder
+        return WebClient.builder()
+            .baseUrl(baseUrl)
+            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .filter { request, next ->
+                // 매 요청마다 최신 토큰 조회
+                val token = tokenManager.getAccessToken()
+                val modifiedRequest = if (token.isNotBlank()) {
+                    org.springframework.web.reactive.function.client.ClientRequest.from(request)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                        .build()
+                } else {
+                    request
+                }
+
                 logger.debug { "Cafe24 API Request: ${request.method()} ${request.url()}" }
-                next.exchange(request)
+                
+                next.exchange(modifiedRequest)
                     .doOnError { error ->
                         when (error) {
                             is WebClientResponseException -> {
@@ -67,16 +67,13 @@ class Cafe24Config {
                                     "Cafe24 API Error: ${error.statusCode} - ${error.responseBodyAsString}"
                                 }
                             }
-
                             else -> {
                                 logger.error(error) { "Cafe24 API Request failed" }
                             }
                         }
                     }
                     .onErrorResume { error ->
-                        logger.error(error) {
-                            "Cafe24 API call failed, returning empty response"
-                        }
+                        logger.error(error) { "Cafe24 API call failed" }
                         Mono.error(error)
                     }
             }

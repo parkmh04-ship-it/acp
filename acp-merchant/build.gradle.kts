@@ -26,6 +26,11 @@ dependencies {
     implementation(libs.spring.boot.starter.webflux)
     implementation(libs.kotlin.logging)
 
+    // Cache & Distributed Lock
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    implementation("com.github.ben-manes.caffeine:caffeine")
+    implementation("org.redisson:redisson-spring-boot-starter:3.43.0")
+
     // DB (Merchant DB)
     implementation(libs.spring.boot.starter.jooq)
     implementation(libs.postgresql)

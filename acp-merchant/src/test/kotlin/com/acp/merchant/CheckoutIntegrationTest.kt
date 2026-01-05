@@ -1,5 +1,6 @@
 package com.acp.merchant
 
+import com.acp.merchant.support.IntegrationTestBase
 import com.acp.merchant.application.port.output.ProductPersistencePort
 import com.acp.merchant.generated.jooq.tables.pojos.Products
 import com.acp.merchant.generated.jooq.tables.references.*
@@ -31,7 +32,7 @@ import java.math.BigDecimal
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-class CheckoutIntegrationTest {
+class CheckoutIntegrationTest : IntegrationTestBase() {
 
     @Autowired
     lateinit var webTestClient: WebTestClient

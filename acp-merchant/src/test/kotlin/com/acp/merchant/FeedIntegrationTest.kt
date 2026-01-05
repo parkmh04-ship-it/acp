@@ -1,8 +1,9 @@
 package com.acp.merchant
 
+import com.acp.merchant.support.IntegrationTestBase
+import com.acp.merchant.application.port.output.Cafe24ProductClient
 import com.acp.merchant.adapter.outbound.cafe24.dto.Cafe24Product
 import com.acp.merchant.adapter.outbound.cafe24.dto.Cafe24ProductsResponse
-import com.acp.merchant.application.port.output.Cafe24ProductClient
 import io.mockk.coEvery
 import io.mockk.mockk
 import org.junit.jupiter.api.BeforeEach
@@ -17,7 +18,7 @@ import org.springframework.test.web.reactive.server.WebTestClient
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-class FeedIntegrationTest {
+class FeedIntegrationTest : IntegrationTestBase() {
 
     @Autowired
     lateinit var webTestClient: WebTestClient

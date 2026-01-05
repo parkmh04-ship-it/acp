@@ -15,6 +15,9 @@ import org.springframework.stereotype.Service
 import java.util.UUID
 import java.time.ZonedDateTime
 
+import org.redisson.api.RedissonClient
+import java.util.concurrent.TimeUnit
+
 @Service
 class CheckoutService(
     private val checkoutRepository: CheckoutRepositoryPort,
@@ -23,7 +26,8 @@ class CheckoutService(
     private val paymentClient: PaymentClient,
     private val pricingEngine: PricingEngine,
     private val shippingCalculator: ShippingCalculator,
-    private val addressValidator: AddressValidator
+    private val addressValidator: AddressValidator,
+    private val redissonClient: RedissonClient
 ) : CheckoutUseCase {
 
     override suspend fun createSession(request: CreateCheckoutSessionRequest): CheckoutSession {
@@ -232,56 +236,70 @@ class CheckoutService(
     }
 
     override suspend fun confirmPayment(sessionId: String, pgToken: String): CheckoutSession {
-        val session = checkoutRepository.findById(sessionId)
-            ?: throw NoSuchElementException("Session not found: $sessionId")
-
-        if (session.status == CheckoutStatus.COMPLETED) {
-            return session
-        }
-
-        if (session.status != CheckoutStatus.READY) {
-            throw IllegalStateException("Session is not ready for payment completion")
-        }
-
-        val approveResponse = paymentClient.approvePayment(
-            PaymentApproveRequest(
-                merchantOrderId = session.id,
-                pgToken = pgToken
-            )
-        )
-
-        if (approveResponse.status != "COMPLETED") {
-            throw IllegalStateException("Payment approval failed: ${approveResponse.status}")
-        }
-
-        val order = Order(
-            id = session.id, // Use session ID as Order ID
-            userId = session.buyer?.email ?: "guest",
-            status = OrderStatus.COMPLETED,
-            totalAmount = session.totals.total,
-            currency = session.currency,
-            paymentRequestIds = approveResponse.paymentId,
-            items = session.items.map { 
-                val product = productRepository.findById(it.productId)
-                val productName = product?.title ?: "Product ${it.productId}"
-                
-                OrderLineItem(
-                    productId = it.productId,
-                    productName = productName,
-                    quantity = it.quantity,
-                    unitPrice = it.unitPrice,
-                    totalPrice = it.totalPrice
-                )
-            }
-        )
-        orderRepository.save(order)
-
-        val completedSession = session.copy(
-            status = CheckoutStatus.COMPLETED,
-            updatedAt = ZonedDateTime.now()
-        )
+        val lock = redissonClient.getLock("lock:checkout:$sessionId")
         
-        return checkoutRepository.save(completedSession)
+        // 락 획득 시도 (최대 5초 대기, 10초간 점유)
+        val acquired = lock.tryLock(5, 10, TimeUnit.SECONDS)
+        if (!acquired) {
+            throw IllegalStateException("Failed to acquire lock for session: $sessionId")
+        }
+
+        try {
+            val session = checkoutRepository.findById(sessionId)
+                ?: throw NoSuchElementException("Session not found: $sessionId")
+
+            if (session.status == CheckoutStatus.COMPLETED) {
+                return session
+            }
+
+            if (session.status != CheckoutStatus.READY) {
+                throw IllegalStateException("Session is not ready for payment completion")
+            }
+
+            val approveResponse = paymentClient.approvePayment(
+                PaymentApproveRequest(
+                    merchantOrderId = session.id,
+                    pgToken = pgToken
+                )
+            )
+
+            if (approveResponse.status != "COMPLETED") {
+                throw IllegalStateException("Payment approval failed: ${approveResponse.status}")
+            }
+
+            val order = Order(
+                id = session.id, // Use session ID as Order ID
+                userId = session.buyer?.email ?: "guest",
+                status = OrderStatus.COMPLETED,
+                totalAmount = session.totals.total,
+                currency = session.currency,
+                paymentRequestIds = approveResponse.paymentId,
+                items = session.items.map { 
+                    val product = productRepository.findById(it.productId)
+                    val productName = product?.title ?: "Product ${it.productId}"
+                    
+                    OrderLineItem(
+                        productId = it.productId,
+                        productName = productName,
+                        quantity = it.quantity,
+                        unitPrice = it.unitPrice,
+                        totalPrice = it.totalPrice
+                    )
+                }
+            )
+            orderRepository.save(order)
+
+            val completedSession = session.copy(
+                status = CheckoutStatus.COMPLETED,
+                updatedAt = ZonedDateTime.now()
+            )
+            
+            return checkoutRepository.save(completedSession)
+        } finally {
+            if (lock.isHeldByCurrentThread) {
+                lock.unlock()
+            }
+        }
     }
 
     override suspend fun cancelSession(id: String, reason: String): CheckoutSession {
