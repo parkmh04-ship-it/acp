@@ -17,11 +17,9 @@ class OrderPersistenceAdapter(
     private val dsl: DSLContext
 ) : OrderRepositoryPort {
 
-    override suspend fun save(order: Order): Order = withContext(Dispatchers.IO) {
-        dsl.transactionResult { configuration ->
-            val txDsl = configuration.dsl()
-
-            txDsl.insertInto(ORDERS)
+    override suspend fun save(order: Order): Order {
+            // 1. Save Order
+            dsl.insertInto(ORDERS)
                 .set(ORDERS.ID, order.id)
                 .set(ORDERS.USER_ID, order.userId)
                 .set(ORDERS.STATUS, order.status.name)
@@ -35,13 +33,14 @@ class OrderPersistenceAdapter(
                 .set(ORDERS.UPDATED_AT, java.time.OffsetDateTime.now())
                 .execute()
 
-            // Delete existing lines (simple update strategy)
-            txDsl.deleteFrom(ORDER_LINES)
+            // 2. Delete existing lines (simple update strategy)
+            dsl.deleteFrom(ORDER_LINES)
                 .where(ORDER_LINES.ORDER_ID.eq(order.id))
                 .execute()
 
+            // 3. Insert new items
             if (order.items.isNotEmpty()) {
-                val insert = txDsl.insertInto(ORDER_LINES,
+                val insert = dsl.insertInto(ORDER_LINES,
                     ORDER_LINES.ID,
                     ORDER_LINES.ORDER_ID,
                     ORDER_LINES.PRODUCT_ID,
@@ -65,14 +64,13 @@ class OrderPersistenceAdapter(
                 insert.execute()
             }
             
-            order
-        }
+            return order
     }
 
-    override suspend fun findById(id: String): Order? = withContext(Dispatchers.IO) {
+    override suspend fun findById(id: String): Order? {
         val record = dsl.selectFrom(ORDERS)
             .where(ORDERS.ID.eq(id))
-            .fetchOne() ?: return@withContext null
+            .fetchOne() ?: return null
 
         val items = dsl.selectFrom(ORDER_LINES)
             .where(ORDER_LINES.ORDER_ID.eq(id))

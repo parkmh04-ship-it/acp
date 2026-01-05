@@ -15,12 +15,9 @@ class CheckoutPersistenceAdapter(
     private val dsl: DSLContext
 ) : CheckoutRepositoryPort {
 
-    override suspend fun save(checkoutSession: CheckoutSession): CheckoutSession = withContext(Dispatchers.IO) {
-        dsl.transactionResult { configuration ->
-            val txDsl = configuration.dsl()
-
+    override suspend fun save(checkoutSession: CheckoutSession): CheckoutSession {
             // 1. Save Session
-            txDsl.insertInto(CHECKOUT_SESSIONS)
+            dsl.insertInto(CHECKOUT_SESSIONS)
                 .set(CHECKOUT_SESSIONS.ID, checkoutSession.id)
                 .set(CHECKOUT_SESSIONS.STATUS, checkoutSession.status.name)
                 .set(CHECKOUT_SESSIONS.CURRENCY, checkoutSession.currency)
@@ -49,13 +46,13 @@ class CheckoutPersistenceAdapter(
                 .execute()
 
             // 2. Delete existing items
-            txDsl.deleteFrom(CHECKOUT_ITEMS)
+            dsl.deleteFrom(CHECKOUT_ITEMS)
                 .where(CHECKOUT_ITEMS.CHECKOUT_SESSION_ID.eq(checkoutSession.id))
                 .execute()
 
             // 3. Insert new items
             if (checkoutSession.items.isNotEmpty()) {
-                val insert = txDsl.insertInto(CHECKOUT_ITEMS,
+                val insert = dsl.insertInto(CHECKOUT_ITEMS,
                     CHECKOUT_ITEMS.CHECKOUT_SESSION_ID,
                     CHECKOUT_ITEMS.PRODUCT_ID,
                     CHECKOUT_ITEMS.QUANTITY,
@@ -75,14 +72,13 @@ class CheckoutPersistenceAdapter(
                 insert.execute()
             }
             
-            checkoutSession
-        }
+            return checkoutSession
     }
 
-    override suspend fun findById(id: String): CheckoutSession? = withContext(Dispatchers.IO) {
+    override suspend fun findById(id: String): CheckoutSession? {
         val record = dsl.selectFrom(CHECKOUT_SESSIONS)
             .where(CHECKOUT_SESSIONS.ID.eq(id))
-            .fetchOne() ?: return@withContext null
+            .fetchOne() ?: return null
 
         val items = dsl.selectFrom(CHECKOUT_ITEMS)
             .where(CHECKOUT_ITEMS.CHECKOUT_SESSION_ID.eq(id))

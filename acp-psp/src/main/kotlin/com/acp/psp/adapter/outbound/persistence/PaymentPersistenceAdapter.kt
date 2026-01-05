@@ -33,8 +33,11 @@ class PaymentPersistenceAdapter(private val dsl: DSLContext) : PaymentRepository
 
     override suspend fun save(payment: Payments): Unit =
             withContext(Dispatchers.IO) {
-                val record = dsl.newRecord(PAYMENTS, payment)
-                dsl.insertInto(PAYMENTS).set(record).execute()
+                dsl.transaction { configuration ->
+                    val txDsl = configuration.dsl()
+                    val record = txDsl.newRecord(PAYMENTS, payment)
+                    txDsl.insertInto(PAYMENTS).set(record).execute()
+                }
                 Unit
             }
 }
