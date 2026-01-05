@@ -24,7 +24,6 @@ class PaymentService(
         private val encryptionPort: EncryptionPort
 ) : PaymentUseCase {
 
-        @Transactional
         override suspend fun preparePayment(
                 request: PaymentPrepareRequest
         ): PaymentPrepareResponse {
@@ -72,7 +71,6 @@ class PaymentService(
                 )
         }
 
-        @Transactional
         override suspend fun approvePayment(request: PaymentApproveRequest): PaymentApproveResponse {
                 // 1. 원본 결제(PREPARE) 조회
                 val prepareRecord = paymentRepositoryPort.findLastByMerchantOrderIdAndType(request.merchantOrderId, "PREPARE")
@@ -149,7 +147,6 @@ class PaymentService(
                 }
         }
 
-        @Transactional
         override suspend fun cancelPayment(request: PaymentCancelRequest): PaymentCancelResponse {
             // 1. 성공한 결제(APPROVE, SUCCESS) 조회
             val approvedRecord = paymentRepositoryPort.findLastByMerchantOrderIdAndType(request.merchantOrderId, "APPROVE")
