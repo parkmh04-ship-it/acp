@@ -49,3 +49,18 @@ data class CardInfo(
     val cardType: String? = null,
     val installMonth: String? = null
 )
+
+@Serializable
+data class PaymentCancelRequest(
+    val merchantOrderId: String,
+    val reason: String,
+    val amount: Long // 전체 취소일 경우 전체 금액, 부분 취소일 경우 해당 금액
+)
+
+@Serializable
+data class PaymentCancelResponse(
+    val paymentId: String,
+    val status: String,
+    val canceledAt: String,
+    val canceledAmount: Long
+)

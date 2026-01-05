@@ -239,10 +239,70 @@ class CheckoutIntegrationTest {
             .expectBody()
             .jsonPath("$.status").isEqualTo("COMPLETED")
 
-        // 4. Verify order in DB (Optional, but good)
+        // 4. Verify order in DB
         val orderRecord = dsl.selectFrom(ORDERS).fetchOne()
         assertNotNull(orderRecord)
         assertEquals("test@example.com", orderRecord?.userId)
+        assertEquals(session.id, orderRecord?.id) // Session ID == Order ID
+    }
+
+    @Test
+    fun `cancel completed session triggers psp cancel and updates order status`() {
+        // 1. Create and Complete Session (similar to confirm payment test)
+        val request = CreateCheckoutSessionRequest(
+            items = listOf(CheckoutItem(id = "prod_1", quantity = 1)),
+            buyer = Buyer("test@example.com", "Tester"),
+            fulfillmentAddress = Address("KR", "12345")
+        )
+
+        val session = webTestClient.post()
+            .uri("/checkout_sessions")
+            .bodyValue(request)
+            .exchange()
+            .returnResult(com.acp.schema.checkout.CheckoutSessionResponse::class.java)
+            .responseBody.blockFirst()!!
+
+        webTestClient.post()
+            .uri("/checkout_sessions/${session.id}")
+            .bodyValue(UpdateCheckoutSessionRequest(fulfillmentOptionId = "standard"))
+            .exchange()
+            .expectStatus().isOk
+
+        // Mock Approval
+        coEvery { paymentClient.approvePayment(any()) } returns com.acp.schema.payment.PaymentApproveResponse(
+            paymentId = "PSP-PAY-123", status = "COMPLETED", totalAmount = 14000L, method = "CARD"
+        )
+        
+        webTestClient.post()
+            .uri("/checkout_sessions/${session.id}/confirm")
+            .bodyValue(mapOf("pg_token" to "DUMMY-TOKEN"))
+            .exchange()
+            .expectStatus().isOk
+
+        // 2. Mock Cancel
+        coEvery { paymentClient.cancelPayment(any()) } returns com.acp.schema.payment.PaymentCancelResponse(
+            paymentId = "PSP-CANCEL-123",
+            status = "CANCELED",
+            canceledAt = "2026-01-05T12:00:00",
+            canceledAmount = 14000L
+        )
+
+        // 3. Request Cancel
+        webTestClient.post()
+            .uri("/checkout_sessions/${session.id}/cancel")
+            .bodyValue(mapOf("reason" to "Changed mind"))
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.status").isEqualTo("CANCELED")
+
+        // 4. Verify Order Status Updated
+        val orderRecord = dsl.selectFrom(ORDERS)
+            .where(ORDERS.ID.eq(session.id))
+            .fetchOne()
+        
+        assertNotNull(orderRecord)
+        assertEquals("CANCELED", orderRecord?.status)
     }
 
     @Test

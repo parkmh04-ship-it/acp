@@ -255,7 +255,7 @@ class CheckoutService(
         }
 
         val order = Order(
-            id = UUID.randomUUID().toString(),
+            id = session.id, // Use session ID as Order ID
             userId = session.buyer?.email ?: "guest",
             status = OrderStatus.COMPLETED,
             totalAmount = session.totals.total,
@@ -282,5 +282,40 @@ class CheckoutService(
         )
         
         return checkoutRepository.save(completedSession)
+    }
+
+    override suspend fun cancelSession(id: String, reason: String): CheckoutSession {
+        val session = checkoutRepository.findById(id)
+            ?: throw NoSuchElementException("Session not found: $id")
+
+        if (session.status == CheckoutStatus.CANCELED) {
+            return session
+        }
+
+        if (session.status == CheckoutStatus.COMPLETED) {
+            // 결제 완료된 세션은 PSP 취소 후 주문 취소 처리
+            val cancelRequest = com.acp.schema.payment.PaymentCancelRequest(
+                merchantOrderId = session.id,
+                reason = reason,
+                amount = session.totals.total.toLong()
+            )
+            
+            // PSP 취소 호출
+            paymentClient.cancelPayment(cancelRequest)
+            
+            // 주문 상태 업데이트
+            val order = orderRepository.findById(session.id)
+            if (order != null) {
+                val canceledOrder = order.copy(status = OrderStatus.CANCELED)
+                orderRepository.save(canceledOrder)
+            }
+        }
+
+        val canceledSession = session.copy(
+            status = CheckoutStatus.CANCELED,
+            updatedAt = ZonedDateTime.now()
+        )
+        
+        return checkoutRepository.save(canceledSession)
     }
 }

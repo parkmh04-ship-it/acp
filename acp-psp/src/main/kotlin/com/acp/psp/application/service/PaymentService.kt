@@ -149,6 +149,62 @@ class PaymentService(
                 }
         }
 
+        @Transactional
+        override suspend fun cancelPayment(request: PaymentCancelRequest): PaymentCancelResponse {
+            // 1. 성공한 결제(APPROVE, SUCCESS) 조회
+            val approvedRecord = paymentRepositoryPort.findLastByMerchantOrderIdAndType(request.merchantOrderId, "APPROVE")
+                ?: throw IllegalArgumentException("No successful payment found for order: ${request.merchantOrderId}")
+            
+            if (approvedRecord.status != "SUCCESS") {
+                 throw IllegalStateException("Payment is not in SUCCESS state: ${approvedRecord.status}")
+            }
+            
+            // 2. 이미 취소된 건인지 확인
+            val existingCancel = paymentRepositoryPort.findLastByMerchantOrderIdAndType(request.merchantOrderId, "CANCEL")
+            if (existingCancel != null && existingCancel.status == "SUCCESS") {
+                logger.info { "Payment already canceled: ${existingCancel.id}" }
+                return PaymentCancelResponse(
+                    paymentId = existingCancel.id!!,
+                    status = "CANCELED",
+                    canceledAt = existingCancel.createdAt!!.toString(),
+                    canceledAmount = existingCancel.amount!!.toLong()
+                )
+            }
+
+            val decryptedTid = approvedRecord.pgTid?.let { encryptionPort.decrypt(it) }
+                 ?: throw IllegalStateException("PG TID missing in approved record")
+
+            // 3. 외부 PG사 취소 요청
+            val cancelResult = paymentProvider.cancel(
+                decryptedTid,
+                request.amount,
+                request.reason
+            )
+
+            // 4. 취소 정보 저장
+            val cancelId = UUID.randomUUID().toString()
+            val cancelPayment = Payments(
+                id = cancelId,
+                merchantOrderId = request.merchantOrderId,
+                orgPaymentId = approvedRecord.id,
+                type = "CANCEL",
+                status = cancelResult.status,
+                amount = cancelResult.amount,
+                currency = approvedRecord.currency,
+                pgProvider = paymentProvider.providerName,
+                pgTid = approvedRecord.pgTid, // 암호화된 상태 유지
+                createdAt = OffsetDateTime.now()
+            )
+            paymentRepositoryPort.save(cancelPayment)
+
+            return PaymentCancelResponse(
+                paymentId = cancelId,
+                status = cancelResult.status,
+                canceledAt = cancelResult.canceledAt,
+                canceledAmount = cancelResult.amount
+            )
+        }
+
         private suspend fun handleNetCancel(prepareRecord: Payments) {
             val decryptedTid = prepareRecord.pgTid?.let { encryptionPort.decrypt(it) }
                 ?: return

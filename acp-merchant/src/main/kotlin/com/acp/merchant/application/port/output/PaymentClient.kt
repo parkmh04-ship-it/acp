@@ -8,4 +8,5 @@ import com.acp.schema.payment.PaymentApproveResponse
 interface PaymentClient {
     suspend fun preparePayment(request: PaymentPrepareRequest): PaymentPrepareResponse
     suspend fun approvePayment(request: PaymentApproveRequest): PaymentApproveResponse
+    suspend fun cancelPayment(request: com.acp.schema.payment.PaymentCancelRequest): com.acp.schema.payment.PaymentCancelResponse
 }

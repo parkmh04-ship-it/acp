@@ -64,8 +64,8 @@
 
 2. **고도화 및 보안**
    - ✅ 민감 정보(pgTid 등) 암호화 저장 로직 구현 (AES-256-GCM 기반 `EncryptionPort`)
+   - ✅ PSP 결제 취소 API 구현 및 Merchant 주문 취소 연동 완료
    - [ ] Cafe24 OAuth 자동 갱신 (Redis 기반 토큰 스토리지 도입 검토)
-   - [ ] PSP 결제 취소 API 구현 및 테스트
 
 ---
 

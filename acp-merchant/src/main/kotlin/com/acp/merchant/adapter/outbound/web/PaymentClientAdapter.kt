@@ -35,4 +35,12 @@ class PaymentClientAdapter(
             .retrieve()
             .awaitBody()
     }
+
+    override suspend fun cancelPayment(request: com.acp.schema.payment.PaymentCancelRequest): com.acp.schema.payment.PaymentCancelResponse {
+        return webClient.post()
+            .uri("/api/v1/payments/cancel")
+            .bodyValue(request)
+            .retrieve()
+            .awaitBody()
+    }
 }

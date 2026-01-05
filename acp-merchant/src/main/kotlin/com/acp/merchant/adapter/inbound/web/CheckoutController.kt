@@ -46,6 +46,13 @@ class CheckoutController(
         return session.toDto()
     }
 
+    @PostMapping("/{id}/cancel")
+    suspend fun cancelSession(@PathVariable id: String, @RequestBody(required = false) request: Map<String, String>?): CheckoutSessionResponse {
+        val reason = request?.get("reason") ?: "User requested cancellation"
+        val session = checkoutUseCase.cancelSession(id, reason)
+        return session.toDto()
+    }
+
     private fun CheckoutSession.toDto(): CheckoutSessionResponse {
         return CheckoutSessionResponse(
             id = this.id,

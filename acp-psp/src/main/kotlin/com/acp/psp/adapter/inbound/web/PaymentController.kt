@@ -28,4 +28,11 @@ class PaymentController(private val paymentUseCase: PaymentUseCase) {
     ): PaymentApproveResponse {
         return paymentUseCase.approvePayment(request)
     }
+
+    @PostMapping("/cancel")
+    suspend fun cancelPayment(
+            @RequestBody request: com.acp.schema.payment.PaymentCancelRequest
+    ): com.acp.schema.payment.PaymentCancelResponse {
+        return paymentUseCase.cancelPayment(request)
+    }
 }
