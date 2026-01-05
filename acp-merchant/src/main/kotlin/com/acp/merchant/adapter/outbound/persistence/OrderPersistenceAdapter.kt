@@ -85,7 +85,7 @@ class OrderPersistenceAdapter(
                 )
             }
 
-        Order(
+        return Order(
             id = record.id!!,
             userId = record.userId!!,
             status = OrderStatus.valueOf(record.status!!),

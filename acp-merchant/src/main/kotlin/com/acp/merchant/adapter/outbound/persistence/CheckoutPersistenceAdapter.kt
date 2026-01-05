@@ -95,7 +95,7 @@ class CheckoutPersistenceAdapter(
         val itemsBaseAmount = items.fold(BigDecimal.ZERO) { acc, i -> acc.add(i.totalPrice) }
         val shippingCost = record.shippingCost ?: BigDecimal.ZERO
 
-        CheckoutSession(
+        return CheckoutSession(
             id = record.id!!,
             status = CheckoutStatus.valueOf(record.status!!),
             currency = record.currency!!,
