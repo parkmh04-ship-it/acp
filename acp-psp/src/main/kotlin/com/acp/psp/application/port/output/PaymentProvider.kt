@@ -24,7 +24,7 @@ interface PaymentProvider {
      *
      * 사용자가 결제를 승인한 후 발급된 토큰을 사용하여 최종 결제 승인을 요청합니다.
      */
-    suspend fun approve(paymentId: String, pgToken: String): PaymentApproval
+    suspend fun approve(tid: String, merchantOrderId: String, pgToken: String): PaymentApproval
 
     /** 결제 취소 (Cancel) */
     suspend fun cancel(paymentId: String, amount: Long, reason: String): PaymentCancelResult

@@ -262,9 +262,12 @@ class CheckoutService(
             currency = session.currency,
             paymentRequestIds = approveResponse.paymentId,
             items = session.items.map { 
+                val product = productRepository.findById(it.productId)
+                val productName = product?.title ?: "Product ${it.productId}"
+                
                 OrderLineItem(
                     productId = it.productId,
-                    productName = "Product ${it.productId}",
+                    productName = productName,
                     quantity = it.quantity,
                     unitPrice = it.unitPrice,
                     totalPrice = it.totalPrice

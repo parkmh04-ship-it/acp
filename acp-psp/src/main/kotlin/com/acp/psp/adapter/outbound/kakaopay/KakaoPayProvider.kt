@@ -50,9 +50,9 @@ class KakaoPayProvider(
                         quantity = totalQuantity,
                         totalAmount = request.amount.toInt(),
                         taxFreeAmount = 0,
-                        approvalUrl = "http://localhost:8080/api/v1/payments/success", // TODO: 실제 콜백 URL
-                        cancelUrl = "http://localhost:8080/api/v1/payments/cancel",
-                        failUrl = "http://localhost:8080/api/v1/payments/fail"
+                        approvalUrl = "http://localhost:8080/api/v1/payments/success?session_id=${request.merchantOrderId}",
+                        cancelUrl = "http://localhost:8080/api/v1/payments/cancel?session_id=${request.merchantOrderId}",
+                        failUrl = "http://localhost:8080/api/v1/payments/fail?session_id=${request.merchantOrderId}"
                 )
 
         val response =
@@ -74,46 +74,18 @@ class KakaoPayProvider(
      *
      * @see https://developers.kakaopay.com/docs/payment/online/single-payment#approve-payment
      */
-    override suspend fun approve(paymentId: String, pgToken: String): PaymentApproval {
-        // 이 메서드는 외부에서 paymentId 대신 tid를 직접 넘겨주거나, 서비스에서 tid를 조회해서 넘겨줘야 함.
-        // 하지만 인터페이스 시그니처가 paymentId를 받으므로, 여기서 조회하거나, 아니면 서비스가 tid를 조회해서 넘기도록 인터페이스 변경 필요.
-        // 현재는 서비스 계층에서 tid를 조회하여 approve 메서드의 첫 번째 인자로 넘겨주는 것이 일반적임. 
-        // 하지만 인터페이스의 paymentId 파라미터는 논리적 ID이고, 실제 구현체 내부에서 tid가 필요함.
-        // 여기서는 편의상 서비스가 이미 tid를 찾아서 첫 번째 인자로 넘겨줬다고 가정하거나(변수명 혼동),
-        // 아니면 서비스가 paymentId를 넘기면 여기서 DB 조회를 해야 하는데, Adapter는 DB 의존성이 없어야 함.
-        // 따라서 서비스 계층에서 tid를 조회하여 넘겨주는 것이 맞음. 
-        // KakaoPayProvider.approve(tid, pgToken) 형태로 호출되어야 함.
-        // 인터페이스 정의를 `approve(pgTid: String, pgToken: String)`로 바꾸거나, `paymentId`를 `pgTid`로 해석해야 함.
-        // 여기서는 `paymentId` 파라미터를 `pgTid`로 간주하고 구현함. (Service에서 pgTid를 넘겨줄 것임)
-        
-        val pgTid = paymentId 
-        
-        logger.info { "Approving KakaoPay payment tid: $pgTid" }
+    override suspend fun approve(tid: String, merchantOrderId: String, pgToken: String): PaymentApproval {
+        logger.info { "Approving KakaoPay payment tid: $tid, merchantOrderId: $merchantOrderId" }
 
         val body =
                 KakaoPayApproveRequest(
                         cid = cid,
-                        tid = pgTid,
-                        partnerOrderId = "ANY", // 카카오페이는 partner_order_id 일치 여부를 체크함. 원래는 DB에 저장된 값을 써야 함.
-                        // 하지만 여기서는 partner_order_id를 알 수 없음.
-                        // 해결책 1: approve 메서드 인자에 partnerOrderId 추가.
-                        // 해결책 2: 서비스에서 partnerOrderId도 조회해서 넘겨줌.
-                        // 일단은 서비스에서 partnerOrderId도 넘겨줘야 한다고 판단됨. 
-                        // 하지만 인터페이스 변경이 번거로우므로, 일단 DB 조회 없이 진행 가능한지 확인.
-                        // 카카오페이 문서상 필수 파라미터임. 불일치 시 에러 발생 가능성 있음.
-                        // 임시로 "ACP_ORDER" 등으로 고정하거나, 인터페이스 확장이 필요함.
-                        // 여기서는 일단 기존 로직대로 "paymentId"를 partnerOrderId로 가정하고 진행. (서비스가 merchantOrderId를 넘겨줄 것임)
+                        tid = tid,
+                        partnerOrderId = merchantOrderId,
                         partnerUserId = "ACP_USER",
                         pgToken = pgToken
                 )
 
-        // 수정: partnerOrderId는 필수이므로, 서비스에서 `paymentId` 인자에 `merchantOrderId`나 `pgTid` 중 하나를 넘겨야 하는데,
-        // 카카오페이 approve에는 `tid`, `partner_order_id`, `partner_user_id`, `pg_token`이 모두 필요함.
-        // 현재 인터페이스: approve(paymentId: String, pgToken: String)
-        // 정보가 부족함. PaymentProvider 인터페이스를 수정하는 것이 가장 깔끔함.
-        // `approve(paymentContext: PaymentContext, pgToken: String)` 처럼 컨텍스트를 넘기거나.
-        // 일단은 TODO 주석을 남기고 구현. (Service 구현 시 partnerOrderId를 paymentId 인자에 태워 보낼지 결정)
-        
         val response =
                 kakaoPayWebClient
                         .post()
@@ -126,7 +98,7 @@ class KakaoPayProvider(
         logger.info { "KakaoPay payment approved: ${response.tid}" }
 
         return PaymentApproval(
-                paymentId = paymentId, // 요청받은 ID 반환
+                paymentId = tid, // tid를 내부 ID처럼 활용
                 pgTid = response.tid,
                 approvedAt = response.approvedAt,
                 amount = response.amount.total.toLong(),

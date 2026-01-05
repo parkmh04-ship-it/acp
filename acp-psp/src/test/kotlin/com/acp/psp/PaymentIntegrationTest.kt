@@ -75,7 +75,7 @@ class PaymentIntegrationTest(
             .expectStatus().isOk
 
         // 2. Approve
-        coEvery { paymentProvider.approve(any(), any()) } returns com.acp.psp.application.port.output.PaymentApproval(
+        coEvery { paymentProvider.approve("TID-123", orderId, "PG-TOKEN") } returns com.acp.psp.application.port.output.PaymentApproval(
             "TID-123", "TID-123", "2026-01-04T00:00:00", 10000, paymentMethod = "CARD"
         )
 

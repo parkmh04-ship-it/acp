@@ -20,7 +20,8 @@ class PaymentServiceTest {
 
     private val paymentRepositoryPort = mockk<PaymentRepositoryPort>(relaxed = true)
     private val paymentProvider = mockk<PaymentProvider>(relaxed = true)
-    private val paymentService = PaymentService(paymentRepositoryPort, paymentProvider)
+    private val encryptionPort = mockk<EncryptionPort>(relaxed = true)
+    private val paymentService = PaymentService(paymentRepositoryPort, paymentProvider, encryptionPort)
 
     @Test
     @DisplayName("기존 결제 기록이 없는 경우, 새 결제를 준비하고 저장해야 한다")
@@ -39,6 +40,7 @@ class PaymentServiceTest {
         coEvery { paymentRepositoryPort.findLastByMerchantOrderIdAndType("ORDER-123", "PREPARE") } returns null
         coEvery { paymentProvider.prepare(any()) } returns mockPrepareResult
         coEvery { paymentProvider.providerName } returns "KAKAOPAY"
+        coEvery { encryptionPort.encrypt("TID-ABC-123") } returns "ENCRYPTED-TID"
 
         // When
         val response = paymentService.preparePayment(request)
@@ -48,7 +50,7 @@ class PaymentServiceTest {
         assertEquals("ORDER-123", response.merchantOrderId)
         assertEquals("READY", response.status)
 
-        coVerify(exactly = 1) { paymentRepositoryPort.save(match { it.type == "PREPARE" && it.status == "READY" }) }
+        coVerify(exactly = 1) { paymentRepositoryPort.save(match { it.type == "PREPARE" && it.status == "READY" && it.pgTid == "ENCRYPTED-TID" }) }
     }
 
     @Test
@@ -63,12 +65,14 @@ class PaymentServiceTest {
             status = "READY",
             amount = 10000L, 
             currency = "KRW",
-            pgTid = "TID-1"
+            pgTid = "ENCRYPTED-TID"
         )
         
         coEvery { paymentRepositoryPort.findLastByMerchantOrderIdAndType("ORDER-123", "PREPARE") } returns prepareRecord
         coEvery { paymentRepositoryPort.findLastByMerchantOrderIdAndType("ORDER-123", "APPROVE") } returns null
-        coEvery { paymentProvider.approve("TID-1", "TOKEN-123") } returns PaymentApproval(
+        coEvery { encryptionPort.decrypt("ENCRYPTED-TID") } returns "TID-1"
+        coEvery { encryptionPort.encrypt("TID-1") } returns "ENCRYPTED-TID"
+        coEvery { paymentProvider.approve("TID-1", "ORDER-123", "TOKEN-123") } returns PaymentApproval(
             paymentId = "TID-1", pgTid = "TID-1", approvedAt = "2026-01-04T00:00:00", amount = 10000L, paymentMethod = "CARD"
         )
 
@@ -92,14 +96,15 @@ class PaymentServiceTest {
             status = "READY",
             amount = 10000L, 
             currency = "KRW",
-            pgTid = "TID-1"
+            pgTid = "ENCRYPTED-TID"
         )
         
         coEvery { paymentRepositoryPort.findLastByMerchantOrderIdAndType("ORDER-123", "PREPARE") } returns prepareRecord
         coEvery { paymentRepositoryPort.findLastByMerchantOrderIdAndType("ORDER-123", "APPROVE") } returns null
+        coEvery { encryptionPort.decrypt("ENCRYPTED-TID") } returns "TID-1"
         
         // 승인 요청 중 타임아웃 발생 모킹 (메시지에 timeout 포함)
-        coEvery { paymentProvider.approve(any(), any()) } throws RuntimeException("Connection timeout")
+        coEvery { paymentProvider.approve(any(), any(), any()) } throws RuntimeException("Connection timeout")
         
         // 망취소 시나리오: 조회 시 PAID 상태면 취소 호출
         coEvery { paymentProvider.checkStatus("TID-1") } returns PaymentStatusInfo(status = "PAID", amount = 10000L)

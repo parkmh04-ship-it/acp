@@ -1,6 +1,7 @@
 package com.acp.psp.application.service
 
 import com.acp.psp.application.port.input.PaymentUseCase
+import com.acp.psp.application.port.output.EncryptionPort
 import com.acp.psp.application.port.output.PaymentProvider
 import com.acp.psp.application.port.output.PaymentRepositoryPort
 import com.acp.psp.generated.jooq.tables.pojos.Payments
@@ -19,7 +20,8 @@ private val logger = KotlinLogging.logger {}
 @Service
 class PaymentService(
         private val paymentRepositoryPort: PaymentRepositoryPort,
-        private val paymentProvider: PaymentProvider
+        private val paymentProvider: PaymentProvider,
+        private val encryptionPort: EncryptionPort
 ) : PaymentUseCase {
 
         @Transactional
@@ -31,11 +33,12 @@ class PaymentService(
                         paymentRepositoryPort.findLastByMerchantOrderIdAndType(request.merchantOrderId, "PREPARE")
 
                 if (existingRecord != null) {
+                        val decryptedTid = existingRecord.pgTid?.let { encryptionPort.decrypt(it) }
                         return PaymentPrepareResponse(
                                 paymentId = existingRecord.id!!,
                                 merchantOrderId = existingRecord.merchantOrderId!!,
                                 redirectUrl =
-                                        "https://mock-kakaopay.com/pay/${existingRecord.pgTid}", // TODO: 실제 저장된 URL 사용 고려
+                                        "https://mock-kakaopay.com/pay/$decryptedTid", // TODO: 실제 저장된 URL 사용 고려
                                 status = existingRecord.status!!
                         )
                 }
@@ -54,7 +57,7 @@ class PaymentService(
                     amount = request.amount,
                     currency = request.currency,
                     pgProvider = paymentProvider.providerName,
-                    pgTid = prepareResult.pgTid,
+                    pgTid = encryptionPort.encrypt(prepareResult.pgTid), // 암호화 저장
                     createdAt = OffsetDateTime.now()
                 )
 
@@ -87,7 +90,10 @@ class PaymentService(
                 }
 
                 try {
-                    val approval = paymentProvider.approve(prepareRecord.pgTid!!, request.pgToken)
+                    val decryptedTid = prepareRecord.pgTid?.let { encryptionPort.decrypt(it) }
+                        ?: throw IllegalStateException("PG TID missing in prepare record")
+                    
+                    val approval = paymentProvider.approve(decryptedTid, request.merchantOrderId, request.pgToken)
                     
                     // 3. 승인 정보 저장 (불변: INSERT)
                     val approveId = UUID.randomUUID().toString()
@@ -100,7 +106,7 @@ class PaymentService(
                         amount = approval.amount,
                         currency = prepareRecord.currency,
                         pgProvider = paymentProvider.providerName,
-                        pgTid = approval.pgTid,
+                        pgTid = encryptionPort.encrypt(approval.pgTid), // 암호화 저장
                         paymentMethodType = approval.paymentMethod,
                         cardIssuer = approval.cardIssuer,
                         createdAt = OffsetDateTime.now()
@@ -134,7 +140,7 @@ class PaymentService(
                         amount = prepareRecord.amount,
                         currency = prepareRecord.currency,
                         pgProvider = paymentProvider.providerName,
-                        pgTid = prepareRecord.pgTid,
+                        pgTid = prepareRecord.pgTid, // 이미 암호화된 상태일 것임
                         createdAt = OffsetDateTime.now()
                     )
                     paymentRepositoryPort.save(failPayment)
@@ -144,13 +150,16 @@ class PaymentService(
         }
 
         private suspend fun handleNetCancel(prepareRecord: Payments) {
-            logger.warn { "Executing Net Cancel for payment: ${prepareRecord.pgTid}" }
+            val decryptedTid = prepareRecord.pgTid?.let { encryptionPort.decrypt(it) }
+                ?: return
+
+            logger.warn { "Executing Net Cancel for payment: $decryptedTid" }
             try {
-                val statusInfo = paymentProvider.checkStatus(prepareRecord.pgTid!!)
+                val statusInfo = paymentProvider.checkStatus(decryptedTid)
                 if (statusInfo.status == "PAID") {
                     logger.info { "Payment was PAID at PG, canceling now..." }
                     paymentProvider.cancel(
-                        prepareRecord.pgTid!!, 
+                        decryptedTid, 
                         prepareRecord.amount!!, 
                         "Net Cancel due to system timeout"
                     )
@@ -166,7 +175,7 @@ class PaymentService(
                         amount = prepareRecord.amount,
                         currency = prepareRecord.currency,
                         pgProvider = paymentProvider.providerName,
-                        pgTid = prepareRecord.pgTid,
+                        pgTid = prepareRecord.pgTid, // 암호화된 상태 유지
                         createdAt = OffsetDateTime.now()
                     )
                     paymentRepositoryPort.save(cancelPayment)
